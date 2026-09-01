@@ -82,6 +82,98 @@
       "published_at": "2026-08-28",
       "review_status": "approved",
       "changelog": [
+{
+  "schema_version": 1,
+  "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
+  "default_channel": "stable",
+  "updated_at": "2026-09-01T09:58:21Z",
+  "versions": [
+    {
+      "version": "1.8.1",
+      "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-01",
+      "review_status": "approved",
+      "changelog": [
+        "新增Shop ID自动获取",
+        "优先从ShopCity登录状态接口识别当前店铺",
+        "支持网址、页面数据、Cookie和浏览器存储兜底识别",
+        "检测值与现有手动值不同时不会静默覆盖"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.1/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "f881409efc045d65cb8caf62dbd447d0067b762b3adecc4ca092438d8e33155c"
+    },
+    {
+      "version": "1.8.0",
+      "channels": ["historical"],
+      "developer": "harmony-s",
+      "published_at": "2026-08-31",
+      "review_status": "approved",
+      "changelog": [
+        "新增GitHub版本中心",
+        "支持稳定版、测试版、开发版和历史版本筛选",
+        "安装前执行SHA-256校验",
+        "升级或回退由Tampermonkey确认"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.0/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "e502f98b8f5d10a284aa008a460199f76c5df83f0aa843ff04010174c8f574d4"
+    },
+    {
+      "version": "1.7.2",
+      "channels": ["historical"],
+      "developer": "harmony-s",
+      "published_at": "2026-08-31",
+      "review_status": "approved",
+      "changelog": [
+        "历史快照：支持面板拖动与位置记忆",
+        "注意：回退后不包含GitHub版本中心，需从仓库重新安装v1.8.0才能恢复"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.7.2/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "c72bb6bfe18026f79067783f97d0132089f3b15f988dfab7371b4da301cf73f1"
+    },
+    {
+      "version": "1.7.1",
+      "channels": ["historical"],
+      "developer": "harmony-s",
+      "published_at": "2026-08-31",
+      "review_status": "approved",
+      "changelog": [
+        "历史快照：增加花费检查点规则说明",
+        "后台批量同步飞书",
+        "注意：回退后不包含GitHub版本中心"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.7.1/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "74203e2eaacfb25703083b036adb166f645eaaabbac5fb24f4355ed82939692d"
+    },
+    {
+      "version": "1.7.0",
+      "channels": ["historical"],
+      "developer": "harmony-s",
+      "published_at": "2026-08-31",
+      "review_status": "approved",
+      "changelog": [
+        "历史快照：广告任务优先执行",
+        "飞书改为后台批量同步",
+        "注意：回退后不包含GitHub版本中心"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.7.0/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "29c7f825fc0d49fbdcda1eea5c2bd72c6b017eb5a400f8d958f90fc456af22c5"
+    },
+    {
+      "version": "1.6.0",
+      "channels": ["historical"],
+      "developer": "harmony-s",
+      "published_at": "2026-08-28",
+      "review_status": "approved",
+      "changelog": [
+        "历史快照：广告控制及飞书广告明细、账户汇总、操作日志同步",
+        "注意：回退后不包含GitHub版本中心"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.6.0/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "a94cda97f56c8ad1d0ca2db9f969ccb99e81ce7aef77389358eba64e307fbf62"
+    }
+  ]
+}
         "历史快照：广告控制及飞书广告明细、账户汇总、操作日志同步",
         "注意：回退后不包含GitHub版本中心"
       ],
