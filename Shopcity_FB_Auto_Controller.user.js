@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shopcity Facebook 广告自动控制器
 // @namespace    xh-shopcity
-// @version      1.8.1
-// @description  自动识别Shop ID；优先执行Shopcity广告检测与控制，后台批量同步飞书；支持GitHub版本选择、校验、升级与回退。
+// @version      1.8.2
+// @description  调整面板模块顺序；自动识别Shop ID；优先执行广告检测与控制，后台批量同步飞书并支持GitHub版本管理。
 // @match        https://*.shopcity.vip/admin/conversion*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -24,7 +24,7 @@
   const FEISHU_SECRET_KEY = 'xh_shopcity_fb_controller_feishu_secret_v1';
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-  const CURRENT_VERSION = '1.8.1';
+  const CURRENT_VERSION = '1.8.2';
   const SHOP_ID_CHECK_URL = '/sail/seller/check-user?islogin=1';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/versions.json';
   const UPDATE_LAST_CHECK_KEY = 'xh_shopcity_fb_controller_update_last_check_v1';
@@ -2139,7 +2139,7 @@
           <div class="stage-row"><strong>保护</strong><input type="number" min="0" step="1" id="xh-review-protection" value="${html(config.review.protectionMinutes)}"><span>分钟免关</span></div>
           <div class="policy-note">只复核本脚本正式模式关闭的广告；人工暂停广告永不自动开启。</div>
         </div>
-        <div class="policy">
+        <div class="policy" id="xh-feishu-panel">
           <div class="policy-title">飞书多维表格同步</div>
           <label><input type="checkbox" id="xh-feishu-enabled" ${config.feishu.enabled ? 'checked' : ''}>启用飞书自动同步</label>
           <div class="two-cols">
@@ -2158,7 +2158,7 @@
           <div class="actions"><button type="button" id="xh-feishu-test">测试飞书连接</button></div>
           <div class="info"><span id="xh-feishu-status" data-kind="idle">尚未测试连接</span><span>Secret仅保存在脚本管理器独立存储</span></div>
         </div>
-        <div class="policy">
+        <div class="policy" id="xh-update-panel">
           <div class="policy-title">GitHub 版本中心</div>
           <div class="info"><span>当前版本：v${CURRENT_VERSION}</span><span>仓库：harmony-s/sc-fb-auto-controller</span></div>
           <label><input type="checkbox" id="xh-update-auto" ${config.update.autoCheck ? 'checked' : ''}>每12小时自动检查一次（不会自动安装）</label>
@@ -2195,6 +2195,9 @@
         <div class="log-title">广告操作日志</div>
         <div class="logs"><table><thead><tr><th>时间</th><th class="id-cell">广告账户ID</th><th class="id-cell">广告ID</th><th>广告名称</th><th class="metric-cell">花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">访客</th><th class="metric-cell">FB成效</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>动作</th><th>规则</th><th>结果</th></tr></thead><tbody id="xh-log-body"></tbody></table></div>
       </div>`;
+    const panelBody = panel.querySelector('.body');
+    panelBody.prepend(panel.querySelector('#xh-feishu-panel'));
+    panelBody.prepend(panel.querySelector('#xh-update-panel'));
     document.body.appendChild(panel);
     applyPanelPosition(panel);
     makePanelDraggable(panel);
