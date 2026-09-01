@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shopcity Facebook 广告自动控制器
 // @namespace    xh-shopcity
-// @version      1.8.0
-// @description  优先执行Shopcity广告检测与控制，后台批量同步飞书；支持GitHub版本选择、校验、升级与回退。
+// @version      1.8.1
+// @description  自动识别Shop ID；优先执行Shopcity广告检测与控制，后台批量同步飞书；支持GitHub版本选择、校验、升级与回退。
 // @match        https://*.shopcity.vip/admin/conversion*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -24,7 +24,8 @@
   const FEISHU_SECRET_KEY = 'xh_shopcity_fb_controller_feishu_secret_v1';
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-  const CURRENT_VERSION = '1.8.0';
+  const CURRENT_VERSION = '1.8.1';
+  const SHOP_ID_CHECK_URL = '/sail/seller/check-user?islogin=1';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/versions.json';
   const UPDATE_LAST_CHECK_KEY = 'xh_shopcity_fb_controller_update_last_check_v1';
   const UPDATE_MANIFEST_CACHE_KEY = 'xh_shopcity_fb_controller_update_manifest_v1';
@@ -310,6 +311,195 @@
       throw new Error(result.msg || `接口错误 code=${result.code}`);
     }
     return result;
+  }
+
+  function normalizeShopIdCandidate(value) {
+    const text = String(value ?? '').trim();
+    return /^\d{1,20}$/.test(text) && Number(text) > 0 ? text : '';
+  }
+
+  function valueAtPath(value, path) {
+    return path.reduce((current, key) => (
+      current && typeof current === 'object' ? current[key] : undefined
+    ), value);
+  }
+
+  function extractShopIdFromObject(value) {
+    if (!value || typeof value !== 'object') return '';
+    const preferredPaths = [
+      ['data', 'current_shop_id'], ['data', 'currentShopId'],
+      ['data', 'shop_id'], ['data', 'shopId'], ['data', 'shopid'],
+      ['data', 'current_shop', 'id'], ['data', 'currentShop', 'id'],
+      ['data', 'shop', 'id'], ['data', 'shopInfo', 'id'],
+      ['data', 'user', 'shop_id'], ['data', 'user', 'shopId'],
+      ['current_shop_id'], ['currentShopId'], ['shop_id'], ['shopId'], ['shopid'],
+      ['current_shop', 'id'], ['currentShop', 'id'], ['shop', 'id'], ['shopInfo', 'id'],
+    ];
+    for (const path of preferredPaths) {
+      const candidate = normalizeShopIdCandidate(valueAtPath(value, path));
+      if (candidate) return candidate;
+    }
+
+    const candidates = new Set();
+    const queue = [{ value, depth: 0 }];
+    let visited = 0;
+    while (queue.length && visited < 2000) {
+      const item = queue.shift();
+      visited += 1;
+      if (!item.value || typeof item.value !== 'object' || item.depth > 7) continue;
+      for (const [key, child] of Object.entries(item.value)) {
+        const normalizedKey = key.toLowerCase().replace(/[-_]/g, '');
+        if (normalizedKey === 'shopid' || normalizedKey === 'currentshopid') {
+          const candidate = normalizeShopIdCandidate(child);
+          if (candidate) candidates.add(candidate);
+        }
+        if (child && typeof child === 'object') queue.push({ value: child, depth: item.depth + 1 });
+      }
+    }
+    return candidates.size === 1 ? [...candidates][0] : '';
+  }
+
+  function extractShopIdFromText(value) {
+    const text = String(value || '');
+    const patterns = [
+      /[?&#](?:shopid|shop_id|shopId)=(\d{1,20})(?:[&#]|$)/,
+      /["'](?:current_shop_id|currentShopId|shop_id|shopId|shopid)["']\s*:\s*["']?(\d{1,20})/,
+    ];
+    for (const pattern of patterns) {
+      const candidate = normalizeShopIdCandidate(text.match(pattern)?.[1]);
+      if (candidate) return candidate;
+    }
+    return '';
+  }
+
+  async function detectShopIdFromLogin() {
+    try {
+      const response = await fetch(new URL(SHOP_ID_CHECK_URL, location.origin), {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'x-requested-with': 'XMLHttpRequest',
+        },
+      });
+      if (!response.ok) return null;
+      const result = await response.json();
+      const shopId = extractShopIdFromObject(result);
+      return shopId ? { shopId, source: 'ShopCity登录状态接口' } : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function detectShopIdFromLocation() {
+    const sources = [location.search, location.hash];
+    for (const source of sources) {
+      const shopId = extractShopIdFromText(source);
+      if (shopId) return { shopId, source: '当前页面网址' };
+    }
+    return null;
+  }
+
+  function detectShopIdFromDocument() {
+    const selectors = [
+      '[data-shop-id]', '[data-shopid]',
+      'input[name="shop_id"]', 'input[name="shopId"]', 'input[name="shopid"]',
+      'select[name="shop_id"]', 'select[name="shopId"]', 'select[name="shopid"]',
+    ];
+    for (const element of document.querySelectorAll(selectors.join(','))) {
+      const shopId = normalizeShopIdCandidate(
+        element.dataset?.shopId || element.getAttribute('data-shop-id') ||
+        element.getAttribute('data-shopid') || element.value
+      );
+      if (shopId) return { shopId, source: '当前页面元素' };
+    }
+    for (const script of document.querySelectorAll('script[type="application/json"]')) {
+      try {
+        const shopId = extractShopIdFromObject(JSON.parse(script.textContent || ''));
+        if (shopId) return { shopId, source: '当前页面数据' };
+      } catch (_) { /* ignore non-JSON script */ }
+    }
+    return null;
+  }
+
+  function detectShopIdFromCookie() {
+    for (const part of String(document.cookie || '').split(';')) {
+      const separator = part.indexOf('=');
+      if (separator < 0) continue;
+      const key = decodeURIComponent(part.slice(0, separator).trim());
+      if (!/^(?:current_?)?shop_?id$/i.test(key)) continue;
+      const shopId = normalizeShopIdCandidate(decodeURIComponent(part.slice(separator + 1).trim()));
+      if (shopId) return { shopId, source: 'ShopCity Cookie' };
+    }
+    return null;
+  }
+
+  function detectShopIdFromStorage() {
+    for (const [storage, label] of [[localStorage, '本地存储'], [sessionStorage, '会话存储']]) {
+      try {
+        for (let index = 0; index < storage.length; index += 1) {
+          const key = storage.key(index) || '';
+          if (key.startsWith('xh_shopcity_fb_controller_')) continue;
+          const raw = storage.getItem(key) || '';
+          if (/^(?:current_?)?shop_?id$/i.test(key)) {
+            const shopId = normalizeShopIdCandidate(raw);
+            if (shopId) return { shopId, source: `ShopCity${label}` };
+          }
+          try {
+            const shopId = extractShopIdFromObject(JSON.parse(raw));
+            if (shopId) return { shopId, source: `ShopCity${label}` };
+          } catch (_) {
+            const shopId = extractShopIdFromText(raw);
+            if (shopId) return { shopId, source: `ShopCity${label}` };
+          }
+        }
+      } catch (_) { /* ignore inaccessible storage */ }
+    }
+    return null;
+  }
+
+  async function detectShopId() {
+    const loginResult = await detectShopIdFromLogin();
+    if (loginResult) return loginResult;
+    return detectShopIdFromLocation()
+      || detectShopIdFromDocument()
+      || detectShopIdFromCookie()
+      || detectShopIdFromStorage();
+  }
+
+  function setShopIdStatus(text, kind = 'idle') {
+    const element = document.querySelector('#xh-shop-id-status');
+    if (!element) return;
+    element.textContent = text;
+    element.dataset.kind = kind;
+  }
+
+  async function autoFillShopId({ force = false, silent = false } = {}) {
+    const input = document.querySelector('#xh-shop-id');
+    const button = document.querySelector('#xh-shop-id-detect');
+    if (!input) return null;
+    if (button) button.disabled = true;
+    if (!silent) setShopIdStatus('正在识别当前店铺…', 'working');
+    try {
+      const result = await detectShopId();
+      const current = normalizeShopIdCandidate(input.value);
+      if (!result) {
+        setShopIdStatus(current ? '未自动识别，继续使用当前手动值' : '未识别到，请手动填写', current ? 'idle' : 'error');
+        return null;
+      }
+      if (current && current !== result.shopId && !force) {
+        setShopIdStatus(`检测到 ${result.shopId}（${result.source}），未覆盖当前值 ${current}`, 'working');
+        return result;
+      }
+      input.value = result.shopId;
+      config.shopId = result.shopId;
+      saveConfig();
+      setShopIdStatus(`已自动获取 ${result.shopId}（${result.source}）`, 'ok');
+      return result;
+    } finally {
+      if (button) button.disabled = false;
+    }
   }
 
   function getFeishuSecret() {
@@ -1850,7 +2040,7 @@
       #xh-fb-controller button.danger{background:#e14c4c;color:#fff}
       #xh-fb-controller button:disabled{opacity:.45;cursor:not-allowed}
       #xh-fb-controller .info{display:flex;justify-content:space-between;gap:10px;padding:8px;border-radius:6px;background:#f4f6fb}
-      #xh-status[data-kind="error"],#xh-feishu-status[data-kind="error"],#xh-update-status[data-kind="error"]{color:#c42d2d} #xh-status[data-kind="ok"],#xh-feishu-status[data-kind="ok"],#xh-update-status[data-kind="ok"]{color:#118146} #xh-status[data-kind="working"],#xh-feishu-status[data-kind="working"],#xh-update-status[data-kind="working"]{color:#245bd7}
+      #xh-status[data-kind="error"],#xh-feishu-status[data-kind="error"],#xh-update-status[data-kind="error"],#xh-shop-id-status[data-kind="error"]{color:#c42d2d} #xh-status[data-kind="ok"],#xh-feishu-status[data-kind="ok"],#xh-update-status[data-kind="ok"],#xh-shop-id-status[data-kind="ok"]{color:#118146} #xh-status[data-kind="working"],#xh-feishu-status[data-kind="working"],#xh-update-status[data-kind="working"],#xh-shop-id-status[data-kind="working"]{color:#245bd7}
       #xh-fb-controller .rules{margin:8px 0;padding:8px 8px 8px 26px;background:#fff8df;border-radius:6px;color:#554b2c}
       #xh-fb-controller .rules li{margin:2px 0}
       #xh-fb-controller .policy{margin-top:10px;padding:10px;background:#f7f8fc;border:1px solid #e2e6f1;border-radius:8px}
@@ -1860,6 +2050,9 @@
       #xh-fb-controller .checkpoint-help strong{color:#245bd7}
       #xh-fb-controller .update-details{white-space:pre-wrap;margin-top:8px;padding:9px 11px;background:#eef5ff;border:1px solid #cfe0ff;border-radius:7px;color:#405172;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
       #xh-fb-controller .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      #xh-fb-controller .input-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
+      #xh-fb-controller .input-action button{padding:7px 9px;white-space:nowrap}
+      #xh-fb-controller .field-status{display:block;min-height:16px;margin-top:3px;font-size:11px;line-height:1.35;color:#66718a}
       #xh-fb-controller .stage-head,#xh-fb-controller .stage-row{display:grid;grid-template-columns:65px 1fr 1fr;gap:6px;align-items:center}
       #xh-fb-controller .stage-head.stage-four,#xh-fb-controller .stage-row.stage-four{grid-template-columns:65px 1fr 1fr 1fr}
       #xh-fb-controller .stage-table{overflow-x:auto;padding-bottom:3px}
@@ -1890,7 +2083,7 @@
         <label>Facebook广告账户ID（换行、逗号或空格分隔）</label>
         <textarea class="account-list" id="xh-account-ids" placeholder="每行一个广告账户ID">${html(config.accountIds.join('\n'))}</textarea>
         <div class="two-cols">
-          <div><label>Shop ID</label><input id="xh-shop-id" value="${html(config.shopId)}"></div>
+          <div><label>Shop ID</label><div class="input-action"><input id="xh-shop-id" value="${html(config.shopId)}"><button type="button" id="xh-shop-id-detect">自动获取</button></div><span id="xh-shop-id-status" class="field-status" data-kind="idle">将从当前登录店铺自动识别</span></div>
           <div><label>任务执行间隔（分钟）</label><input type="number" min="1" step="1" id="xh-interval-minutes" value="${html(config.intervalMinutes)}"></div>
         </div>
         <label>运行模式</label>
@@ -2032,6 +2225,9 @@
       button.closest('.stage-policy-row').remove();
     });
 
+    panel.querySelector('#xh-shop-id-detect').addEventListener('click', () => {
+      autoFillShopId({ force: true }).catch((error) => setShopIdStatus(`自动获取失败：${error.message}`, 'error'));
+    });
     panel.querySelector('#xh-start').addEventListener('click', start);
     panel.querySelector('#xh-stop').addEventListener('click', stop);
     panel.querySelector('#xh-run-once').addEventListener('click', () => {
@@ -2100,6 +2296,10 @@
     renderSummaries();
     renderLogs();
     updateButtons();
+    window.setTimeout(() => {
+      autoFillShopId({ force: false, silent: Boolean(normalizeShopIdCandidate(config.shopId)) })
+        .catch((error) => setShopIdStatus(`自动获取失败：${error.message}`, 'error'));
+    }, 300);
     if (config.update.autoCheck) {
       let lastCheck = 0;
       try { lastCheck = numberValue(GM_getValue(UPDATE_LAST_CHECK_KEY, 0)); } catch (_) { /* ignore */ }
