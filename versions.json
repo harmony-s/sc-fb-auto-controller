@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-01T09:58:21Z",
+  "updated_at": "2026-09-01T10:19:42Z",
   "versions": [
     {
-      "version": "1.8.1",
+      "version": "1.8.2",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-01",
+      "review_status": "approved",
+      "changelog": [
+        "调整脚本面板模块顺序",
+        "GitHub版本中心移动到面板最顶部",
+        "飞书多维表格同步移动到GitHub版本中心之后",
+        "现有配置、事件和功能保持不变"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.2/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "33788850d6d2c41d9a93d9bad289b8b1e35faf7decb50d73fd914b3cd6ff5e93"
+    },
+    {
+      "version": "1.8.1",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-01",
       "review_status": "approved",
