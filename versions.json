@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-02T12:38:09Z",
+  "updated_at": "2026-09-02T13:40:12Z",
   "versions": [
     {
-      "version": "1.8.3",
+      "version": "1.8.4",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-02",
+      "review_status": "approved",
+      "changelog": [
+        "广告操作日志移动到广告账户汇总统计前",
+        "广告操作日志新增广告账户ID筛选",
+        "广告操作日志新增广告ID筛选",
+        "筛选条件输入后即时刷新日志列表"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.4/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "6ca199b6c51fe3b76f9c2c85054bad9157faf41c57f29742b352b5cfb8f39459"
+    },
+    {
+      "version": "1.8.3",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-02",
       "review_status": "approved",
