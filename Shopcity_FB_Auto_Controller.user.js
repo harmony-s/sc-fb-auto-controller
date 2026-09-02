@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shopcity Facebook 广告自动控制器
 // @namespace    xh-shopcity
-// @version      1.8.2
-// @description  调整面板模块顺序；自动识别Shop ID；优先执行广告检测与控制，后台批量同步飞书并支持GitHub版本管理。
+// @version      1.8.3
+// @description  复核按独立间隔与次数执行，达标立即恢复；自动识别Shop ID并支持飞书同步和GitHub版本管理。
 // @match        https://*.shopcity.vip/admin/conversion*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -24,7 +24,7 @@
   const FEISHU_SECRET_KEY = 'xh_shopcity_fb_controller_feishu_secret_v1';
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-  const CURRENT_VERSION = '1.8.2';
+  const CURRENT_VERSION = '1.8.3';
   const SHOP_ID_CHECK_URL = '/sail/seller/check-user?islogin=1';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/versions.json';
   const UPDATE_LAST_CHECK_KEY = 'xh_shopcity_fb_controller_update_last_check_v1';
@@ -54,7 +54,7 @@
     review: {
       enabled: true,
       delayMinutes: 40,
-      maxReopensPerDay: 1,
+      maxReviews: 3,
       protectionMinutes: 60,
     },
     policy: {
@@ -77,6 +77,8 @@
   let timerId = null;
   let nextRunAt = null;
   let countdownId = null;
+  let reviewTimerId = null;
+  let reviewExecuting = false;
   let feishuTokenCache = null;
   let updateManifestCache = null;
   const feishuFieldCache = new Map();
@@ -117,7 +119,11 @@
       whitelist: Array.isArray(value?.whitelist) ? value.whitelist.map(String) : [],
       feishu: { ...DEFAULT_CONFIG.feishu, ...feishu },
       update: { ...DEFAULT_CONFIG.update, ...update },
-      review: { ...DEFAULT_CONFIG.review, ...review },
+      review: {
+        ...DEFAULT_CONFIG.review,
+        ...review,
+        maxReviews: numberValue(review.maxReviews ?? review.maxReopensPerDay ?? DEFAULT_CONFIG.review.maxReviews),
+      },
       policy: {
         ...DEFAULT_CONFIG.policy,
         ...policy,
@@ -1146,7 +1152,7 @@
       '操作时间': Date.parse(log.time) || Date.now(),
       '数据日期': dateTimestamp(pacificDate(new Date(log.time))),
       '执行批次ID': String(log.execution_id || ''),
-      '执行来源': ({ auto: '自动执行', start: '启动执行', manual: '手动执行' })[log.source] || String(log.source || ''),
+      '执行来源': ({ auto: '自动执行', start: '启动执行', manual: '手动执行', review_timer: '独立复核' })[log.source] || String(log.source || ''),
       '运行模式': log.mode === 'live' ? '正式模式' : '观察模式',
       '数据时区': 'America/Los_Angeles',
       'Shop ID': String(config.shopId),
@@ -1182,7 +1188,7 @@
       '首次暂停时间': managed.closed_at || undefined,
       '计划复核时间': managed.review_due_at || undefined,
       '实际复核时间': log.action?.startsWith('REVIEW_') ? Date.parse(log.time) : undefined,
-      '当日恢复次数': numberValue(managed.reopen_count),
+      '已复核次数': numberValue(managed.review_count),
       '恢复保护截止时间': managed.protection_until || undefined,
       '暂停规则ID': String(managed.close_rule || ''),
       '复核规则ID': String(managed.review_rule || ''),
@@ -1408,6 +1414,7 @@
       closed_at: closedAt,
       stats_date: pacificDate(new Date(closedAt)),
       review_due_at: closedAt + numberValue(config.review.delayMinutes) * 60000,
+      review_count: 0,
       review_done: false,
       close_rule: rule.id,
       protection_until: 0,
@@ -1486,11 +1493,19 @@
           metrics: metricsOf(ad),
         };
 
+        current.review_count = numberValue(current.review_count) + 1;
+
         if (latestRule) {
-          current.review_done = true;
-          current.state = 'review_kept_paused';
           current.review_rule = latestRule.id;
           result.kept += 1;
+          if (current.review_count >= numberValue(config.review.maxReviews)) {
+            current.review_done = true;
+            current.state = 'review_limit_reached';
+          } else {
+            current.review_done = false;
+            current.state = 'paused_by_script';
+            current.review_due_at = Date.now() + numberValue(config.review.delayMinutes) * 60000;
+          }
           addLog({
             ...baseLog,
             action: 'REVIEW_KEEP_PAUSED',
@@ -1498,31 +1513,26 @@
             category: latestRule.category,
             reason: latestRule.reason,
             success: true,
-            message: '复核后仍命中关闭规则，保持暂停',
-          });
-          saveManagedAds(managed);
-          continue;
-        }
-
-        const today = pacificDate();
-        const reopenCount = current.reopen_count_date === today ? numberValue(current.reopen_count) : 0;
-        if (reopenCount >= numberValue(config.review.maxReopensPerDay)) {
-          current.review_done = true;
-          current.state = 'review_reopen_limit';
-          result.kept += 1;
-          addLog({
-            ...baseLog, action: 'REVIEW_REOPEN_LIMIT', success: true,
-            message: `最新数据已达标，但今日自动恢复次数已达上限 ${config.review.maxReopensPerDay}`,
+            message: current.review_done
+              ? `复核后仍命中关闭规则；已完成 ${current.review_count}/${config.review.maxReviews} 次复核，保持暂停并结束复核`
+              : `复核后仍命中关闭规则；已完成 ${current.review_count}/${config.review.maxReviews} 次复核，保持暂停并等待下次复核`,
           });
           saveManagedAds(managed);
           continue;
         }
 
         if (config.mode === 'observe') {
+          if (current.review_count >= numberValue(config.review.maxReviews)) {
+            current.review_done = true;
+            current.state = 'review_limit_reached';
+          } else {
+            current.review_due_at = Date.now() + numberValue(config.review.delayMinutes) * 60000;
+          }
           addLog({
             ...baseLog, action: 'WOULD_REOPEN', success: true,
-            message: '复核后已不再命中关闭规则；观察模式未执行恢复',
+            message: `复核后已不再命中关闭规则；观察模式未执行恢复（${current.review_count}/${config.review.maxReviews} 次）`,
           });
+          saveManagedAds(managed);
           continue;
         }
 
@@ -1531,8 +1541,6 @@
           current.review_done = true;
           current.state = 'reopened';
           current.reopened_at = Date.now();
-          current.reopen_count_date = today;
-          current.reopen_count = reopenCount + 1;
           current.protection_until = Date.now() + numberValue(config.review.protectionMinutes) * 60000;
           result.reopened += 1;
           addLog({
@@ -1542,13 +1550,74 @@
           saveManagedAds(managed);
         } catch (error) {
           result.failed += 1;
+          if (current.review_count >= numberValue(config.review.maxReviews)) {
+            current.review_done = true;
+            current.state = 'review_failed_limit';
+          } else {
+            current.review_done = false;
+            current.state = 'paused_by_script';
+            current.review_due_at = Date.now() + numberValue(config.review.delayMinutes) * 60000;
+          }
           addLog({ ...baseLog, action: 'REOPEN', success: false, message: error.message });
+          saveManagedAds(managed);
         }
       }
     }
 
     saveManagedAds(managed);
     return result;
+  }
+
+  function clearScheduledReview() {
+    if (reviewTimerId) window.clearTimeout(reviewTimerId);
+    reviewTimerId = null;
+  }
+
+  function scheduleNextReview() {
+    clearScheduledReview();
+    if (!running || !config.review.enabled) return;
+    const dueTimes = Object.values(getManagedAds())
+      .filter((record) => record.state === 'paused_by_script' && !record.review_done)
+      .map((record) => numberValue(record.review_due_at))
+      .filter((value) => value > 0);
+    if (!dueTimes.length) return;
+    reviewTimerId = window.setTimeout(runDueReviews, Math.max(0, Math.min(...dueTimes) - Date.now()));
+  }
+
+  async function runDueReviews() {
+    reviewTimerId = null;
+    if (!running || reviewExecuting) return;
+    if (executing) {
+      reviewTimerId = window.setTimeout(runDueReviews, 5000);
+      return;
+    }
+    reviewExecuting = true;
+    const executionId = `${Date.now()}-review-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const accountIds = [...new Set(Object.values(getManagedAds())
+        .filter((record) => record.state === 'paused_by_script' && !record.review_done && numberValue(record.review_due_at) <= Date.now())
+        .map((record) => String(record.account_id))
+        .filter(Boolean))];
+      for (const accountId of accountIds) {
+        try {
+          await reviewPausedAds(accountId, executionId, 'review_timer');
+        } catch (error) {
+          const managed = getManagedAds();
+          for (const record of Object.values(managed)) {
+            if (record.account_id === accountId && record.state === 'paused_by_script' && !record.review_done && numberValue(record.review_due_at) <= Date.now()) {
+              record.review_due_at = Date.now() + Math.max(1, numberValue(config.review.delayMinutes)) * 60000;
+            }
+          }
+          saveManagedAds(managed);
+          addLog({ execution_id: executionId, source: 'review_timer', mode: config.mode, account_id: accountId, action: 'ACCOUNT_ERROR', success: false, message: `独立复核失败：${error.message}` });
+        }
+      }
+      renderSummaries();
+      renderLogs();
+    } finally {
+      reviewExecuting = false;
+      scheduleNextReview();
+    }
   }
 
   async function executeRound(source = 'auto') {
@@ -1684,6 +1753,7 @@
       setStatus(`执行失败：${error.message}`, 'error');
     } finally {
       executing = false;
+      scheduleNextReview();
       if (running) scheduleNextRun();
       updateButtons();
     }
@@ -1707,7 +1777,7 @@
       ['加购保护花费', config.policy.cartProtectionSpend],
       ['加购保护数量', config.policy.cartProtectionCount],
       ['关闭后复核等待分钟', config.review.delayMinutes],
-      ['每天最多恢复次数', config.review.maxReopensPerDay],
+      ['最多复核次数', config.review.maxReviews],
       ['恢复保护分钟', config.review.protectionMinutes],
       ['任务执行间隔', config.intervalMinutes],
       ...Object.keys(config.policy.stages).flatMap((spend) => [
@@ -1750,8 +1820,11 @@
     if (!Number.isInteger(Number(config.policy.effectProtectionCount)) || Number(config.policy.effectProtectionCount) < 1) {
       throw new Error('成效保护最低数量必须是大于等于1的整数');
     }
-    if (!Number.isInteger(Number(config.review.maxReopensPerDay))) {
-      throw new Error('每天最多恢复次数必须是整数');
+    if (!Number.isInteger(Number(config.review.maxReviews)) || Number(config.review.maxReviews) < 1) {
+      throw new Error('最多复核次数必须是大于等于1的整数');
+    }
+    if (!Number.isInteger(Number(config.review.delayMinutes)) || Number(config.review.delayMinutes) < 1) {
+      throw new Error('复核间隔必须是大于等于1的整数分钟');
     }
     if (!Number.isInteger(Number(config.intervalMinutes)) || Number(config.intervalMinutes) < 1) {
       throw new Error('任务执行间隔必须是大于等于1的整数分钟');
@@ -1798,12 +1871,14 @@
     }
     running = true;
     updateButtons();
+    scheduleNextReview();
     executeRound('start');
   }
 
   function stop() {
     running = false;
     clearScheduledRun();
+    clearScheduledReview();
     updateButtons();
     setStatus(executing ? '已停止后续循环；本轮仍在执行' : '已停止', 'idle');
   }
@@ -1862,7 +1937,7 @@
       review: {
         enabled: document.querySelector('#xh-review-enabled').checked,
         delayMinutes: fieldNumber('#xh-review-delay'),
-        maxReopensPerDay: fieldNumber('#xh-review-max'),
+        maxReviews: fieldNumber('#xh-review-max'),
         protectionMinutes: fieldNumber('#xh-review-protection'),
       },
       policy: {
@@ -2134,10 +2209,10 @@
           <div class="policy-title">关闭后复核</div>
           <label><input type="checkbox" id="xh-review-enabled" ${config.review.enabled ? 'checked' : ''}>启用脚本关闭广告复核</label>
           <div class="stage-head"><span></span><span>数值</span><span>单位</span></div>
-          <div class="stage-row"><strong>等待</strong><input type="number" min="0" step="1" id="xh-review-delay" value="${html(config.review.delayMinutes)}"><span>分钟后复核</span></div>
-          <div class="stage-row"><strong>恢复</strong><input type="number" min="0" step="1" id="xh-review-max" value="${html(config.review.maxReopensPerDay)}"><span>次/广告/天</span></div>
+          <div class="stage-row"><strong>间隔</strong><input type="number" min="1" step="1" id="xh-review-delay" value="${html(config.review.delayMinutes)}"><span>分钟</span></div>
+          <div class="stage-row"><strong>次数</strong><input type="number" min="1" step="1" id="xh-review-max" value="${html(config.review.maxReviews)}"><span>次/广告</span></div>
           <div class="stage-row"><strong>保护</strong><input type="number" min="0" step="1" id="xh-review-protection" value="${html(config.review.protectionMinutes)}"><span>分钟免关</span></div>
-          <div class="policy-note">只复核本脚本正式模式关闭的广告；人工暂停广告永不自动开启。</div>
+          <div class="policy-note">只复核本脚本正式模式关闭的广告；未达标时按间隔继续复核，达到次数后结束；任意一次达标都会立即恢复。人工暂停广告永不自动开启。</div>
         </div>
         <div class="policy" id="xh-feishu-panel">
           <div class="policy-title">飞书多维表格同步</div>
@@ -2295,6 +2370,7 @@
     window.addEventListener('beforeunload', () => {
       if (countdownId) window.clearInterval(countdownId);
       if (timerId) window.clearTimeout(timerId);
+      if (reviewTimerId) window.clearTimeout(reviewTimerId);
     });
     renderSummaries();
     renderLogs();
