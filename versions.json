@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-02T13:44:07Z",
+  "updated_at": "2026-09-02T14:01:25Z",
   "versions": [
     {
-      "version": "1.8.4",
+      "version": "1.8.5",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-02",
+      "review_status": "approved",
+      "changelog": [
+        "关闭后复核模块取消保护时长配置",
+        "复核恢复后立即回到正常检测流程",
+        "复核模块仅保留复核间隔与复核次数",
+        "操作日志不再记录恢复保护截止时间"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.5/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "4ea2a2f194bd943bb7a12e4628796fac941104ec091613284f881be0543e7d0d"
+    },
+    {
+      "version": "1.8.4",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-02",
       "review_status": "approved",
