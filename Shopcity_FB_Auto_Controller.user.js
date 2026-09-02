@@ -55,7 +55,6 @@
       enabled: true,
       delayMinutes: 40,
       maxReviews: 3,
-      protectionMinutes: 60,
     },
     policy: {
       effectProtectionSpend: 6,
@@ -120,8 +119,8 @@
       feishu: { ...DEFAULT_CONFIG.feishu, ...feishu },
       update: { ...DEFAULT_CONFIG.update, ...update },
       review: {
-        ...DEFAULT_CONFIG.review,
-        ...review,
+        enabled: typeof review.enabled === 'boolean' ? review.enabled : DEFAULT_CONFIG.review.enabled,
+        delayMinutes: numberValue(review.delayMinutes ?? DEFAULT_CONFIG.review.delayMinutes),
         maxReviews: numberValue(review.maxReviews ?? review.maxReopensPerDay ?? DEFAULT_CONFIG.review.maxReviews),
       },
       policy: {
@@ -1189,7 +1188,6 @@
       '计划复核时间': managed.review_due_at || undefined,
       '实际复核时间': log.action?.startsWith('REVIEW_') ? Date.parse(log.time) : undefined,
       '已复核次数': numberValue(managed.review_count),
-      '恢复保护截止时间': managed.protection_until || undefined,
       '暂停规则ID': String(managed.close_rule || ''),
       '复核规则ID': String(managed.review_rule || ''),
     });
@@ -1417,14 +1415,8 @@
       review_count: 0,
       review_done: false,
       close_rule: rule.id,
-      protection_until: 0,
     };
     saveManagedAds(managed);
-  }
-
-  function isInReopenProtection(accountId, adId) {
-    const record = getManagedAds()[managedKey(accountId, adId)];
-    return Boolean(record && record.state === 'reopened' && numberValue(record.protection_until) > Date.now());
   }
 
   async function reviewPausedAds(accountId, executionId, source) {
@@ -1541,11 +1533,10 @@
           current.review_done = true;
           current.state = 'reopened';
           current.reopened_at = Date.now();
-          current.protection_until = Date.now() + numberValue(config.review.protectionMinutes) * 60000;
           result.reopened += 1;
           addLog({
             ...baseLog, action: 'REOPEN', success: true,
-            message: `${activation.msg || 'success'}；保护${config.review.protectionMinutes}分钟`,
+            message: activation.msg || 'success',
           });
           saveManagedAds(managed);
         } catch (error) {
@@ -1631,7 +1622,6 @@
     let paused = 0;
     let failed = 0;
     let accountsCompleted = 0;
-    let protectedCount = 0;
     let reviewed = 0;
     let reopened = 0;
     let keptPaused = 0;
@@ -1648,17 +1638,11 @@
           let accountChecked = 0;
           let accountMatched = 0;
           let accountPaused = 0;
-          let accountProtected = 0;
 
           for (const ad of ads) {
             checked += 1;
             accountChecked += 1;
             const adId = String(ad.ad_id || '');
-            if (isInReopenProtection(accountId, adId)) {
-              protectedCount += 1;
-              accountProtected += 1;
-              continue;
-            }
             const rule = matchRule(ad);
             if (!rule) continue;
             matched += 1;
@@ -1714,7 +1698,7 @@
             action: 'ACCOUNT_SUMMARY',
             success: reviewResult.failed === 0,
             metrics: accountMetrics,
-            message: `当日全部广告${allAds.length}条，活动${ads.length}条，检查${accountChecked}条，保护${accountProtected}条，命中${accountMatched}条，暂停${accountPaused}条，复核${reviewResult.reviewed}条，恢复${reviewResult.reopened}条，保持暂停${reviewResult.kept}条，失败${reviewResult.failed}条`,
+            message: `当日全部广告${allAds.length}条，活动${ads.length}条，检查${accountChecked}条，命中${accountMatched}条，暂停${accountPaused}条，复核${reviewResult.reviewed}条，恢复${reviewResult.reopened}条，保持暂停${reviewResult.kept}条，失败${reviewResult.failed}条`,
           });
           queueFeishuAccountSync(allAds, accountId, executionId);
         } catch (error) {
@@ -1737,7 +1721,7 @@
         mode: config.mode,
         action: 'ROUND_SUMMARY',
         success: failed === 0,
-        message: `账户${accountsCompleted}/${config.accountIds.length}，检查${checked}条，保护${protectedCount}条，命中${matched}条，暂停${paused}条，复核${reviewed}条，恢复${reopened}条，保持暂停${keptPaused}条，失败${failed}条`,
+        message: `账户${accountsCompleted}/${config.accountIds.length}，检查${checked}条，命中${matched}条，暂停${paused}条，复核${reviewed}条，恢复${reopened}条，保持暂停${keptPaused}条，失败${failed}条`,
       });
       setStatus(`完成：账户${accountsCompleted}/${config.accountIds.length}，检查${checked}，暂停${paused}，复核${reviewed}，恢复${reopened}，失败${failed}`, failed ? 'error' : 'ok');
     } catch (error) {
@@ -1776,9 +1760,8 @@
       ['成效保护数量', config.policy.effectProtectionCount],
       ['加购保护花费', config.policy.cartProtectionSpend],
       ['加购保护数量', config.policy.cartProtectionCount],
-      ['关闭后复核等待分钟', config.review.delayMinutes],
+      ['复核间隔分钟', config.review.delayMinutes],
       ['最多复核次数', config.review.maxReviews],
-      ['恢复保护分钟', config.review.protectionMinutes],
       ['任务执行间隔', config.intervalMinutes],
       ...Object.keys(config.policy.stages).flatMap((spend) => [
         [`$${spend}阶段FB最少单次链接点击`, config.policy.stages[spend].minFbClicks],
@@ -1938,7 +1921,6 @@
         enabled: document.querySelector('#xh-review-enabled').checked,
         delayMinutes: fieldNumber('#xh-review-delay'),
         maxReviews: fieldNumber('#xh-review-max'),
-        protectionMinutes: fieldNumber('#xh-review-protection'),
       },
       policy: {
         effectProtectionSpend: fieldNumber('#xh-effect-protection-spend'),
@@ -2220,8 +2202,7 @@
           <div class="stage-head"><span></span><span>数值</span><span>单位</span></div>
           <div class="stage-row"><strong>间隔</strong><input type="number" min="1" step="1" id="xh-review-delay" value="${html(config.review.delayMinutes)}"><span>分钟</span></div>
           <div class="stage-row"><strong>次数</strong><input type="number" min="1" step="1" id="xh-review-max" value="${html(config.review.maxReviews)}"><span>次/广告</span></div>
-          <div class="stage-row"><strong>保护</strong><input type="number" min="0" step="1" id="xh-review-protection" value="${html(config.review.protectionMinutes)}"><span>分钟免关</span></div>
-          <div class="policy-note">只复核本脚本正式模式关闭的广告；未达标时按间隔继续复核，达到次数后结束；任意一次达标都会立即恢复。人工暂停广告永不自动开启。</div>
+          <div class="policy-note">只复核本脚本正式模式关闭的广告；未达标时按间隔继续复核，达到次数后结束；任意一次达标都会立即恢复。恢复后立即回到正常检测流程；人工暂停广告永不自动开启。</div>
         </div>
         <div class="policy" id="xh-feishu-panel">
           <div class="policy-title">飞书多维表格同步</div>
