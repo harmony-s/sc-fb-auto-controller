@@ -1998,8 +1998,16 @@
   function renderLogs() {
     const body = document.querySelector('#xh-log-body');
     if (!body) return;
+    const accountFilter = document.querySelector('#xh-log-filter-account')?.value.trim();
+    const adFilter = document.querySelector('#xh-log-filter-ad')?.value.trim();
     const logs = getLogs()
       .filter((log) => !['ACCOUNT_SUMMARY', 'ROUND_SUMMARY', 'REVIEW_KEEP_PAUSED'].includes(log.action))
+      .filter((log) => {
+        const accountId = String(log.account_id || '');
+        const adId = String(log.ad_id || '');
+        return (!accountFilter || accountId.includes(accountFilter))
+          && (!adFilter || adId.includes(adFilter));
+      })
       .slice(0, 60);
     body.innerHTML = logs.map((log) => {
       const time = log.time ? new Date(log.time).toLocaleString() : '';
@@ -2139,6 +2147,7 @@
       #xh-fb-controller .stage-tools{display:flex;justify-content:flex-end;margin-top:7px}
       #xh-fb-controller .logs{margin-top:9px;max-height:210px;overflow:auto;border:1px solid #e1e5f0}
       #xh-fb-controller .log-title{margin-top:12px;font-weight:700;color:#334269}
+      #xh-fb-controller .log-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
       #xh-fb-controller table{width:100%;border-collapse:collapse;font-size:11px}
       #xh-fb-controller th,#xh-fb-controller td{padding:5px;border-bottom:1px solid #edf0f7;text-align:left;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       #xh-fb-controller th.id-cell,#xh-fb-controller td.id-cell{min-width:155px;max-width:none;overflow:visible;text-overflow:clip}
@@ -2265,10 +2274,14 @@
           <button id="xh-export">导出CSV</button>
           <button id="xh-clear-logs">清空日志</button>
         </div>
+        <div class="log-title">广告操作日志</div>
+        <div class="log-filters">
+          <div><label>筛选广告账户ID</label><input id="xh-log-filter-account" placeholder="输入广告账户ID"></div>
+          <div><label>筛选广告ID</label><input id="xh-log-filter-ad" placeholder="输入广告ID"></div>
+        </div>
+        <div class="logs"><table><thead><tr><th>时间</th><th class="id-cell">广告账户ID</th><th class="id-cell">广告ID</th><th>广告名称</th><th class="metric-cell">花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">访客</th><th class="metric-cell">FB成效</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>动作</th><th>规则</th><th>结果</th></tr></thead><tbody id="xh-log-body"></tbody></table></div>
         <div class="log-title">广告账户汇总统计</div>
         <div class="logs"><table><thead><tr><th>执行时间</th><th class="id-cell">广告账户ID</th><th class="metric-cell">总花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">平均CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">FB成效</th><th class="metric-cell">访客</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>本轮处理情况</th></tr></thead><tbody id="xh-summary-body"></tbody></table></div>
-        <div class="log-title">广告操作日志</div>
-        <div class="logs"><table><thead><tr><th>时间</th><th class="id-cell">广告账户ID</th><th class="id-cell">广告ID</th><th>广告名称</th><th class="metric-cell">花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">访客</th><th class="metric-cell">FB成效</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>动作</th><th>规则</th><th>结果</th></tr></thead><tbody id="xh-log-body"></tbody></table></div>
       </div>`;
     const panelBody = panel.querySelector('.body');
     panelBody.prepend(panel.querySelector('#xh-feishu-panel'));
@@ -2358,6 +2371,8 @@
     panel.querySelector('#xh-update-install').addEventListener('click', () => {
       installSelectedRelease().catch((error) => setUpdateStatus(`安装已阻止：${error.message}`, 'error'));
     });
+    panel.querySelector('#xh-log-filter-account').addEventListener('input', renderLogs);
+    panel.querySelector('#xh-log-filter-ad').addEventListener('input', renderLogs);
     panel.querySelector('#xh-export').addEventListener('click', exportCsv);
     panel.querySelector('#xh-clear-logs').addEventListener('click', clearLogs);
     panel.querySelector('#xh-collapse').addEventListener('click', () => {
