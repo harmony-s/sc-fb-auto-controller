@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-02T14:01:25Z",
+  "updated_at": "2026-09-04T16:18:26Z",
   "versions": [
     {
-      "version": "1.8.5",
+      "version": "1.8.6",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-05",
+      "review_status": "approved",
+      "changelog": [
+        "Shop ID自动获取改用ShopCity API登录状态接口",
+        "登录状态接口请求方式改为POST",
+        "支持从登录状态返回的data.id和data.uid识别Shop ID",
+        "同步更新Shop ID自动获取说明"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.6/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "08387b0da2a6af507933ae5064fa5d294b1dc86f5426f32ee9c49aa7d97aafe3"
+    },
+    {
+      "version": "1.8.5",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-02",
       "review_status": "approved",
