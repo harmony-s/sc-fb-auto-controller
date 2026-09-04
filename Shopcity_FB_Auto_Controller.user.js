@@ -25,7 +25,7 @@
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
   const CURRENT_VERSION = '1.8.5';
-  const SHOP_ID_CHECK_URL = '/sail/seller/check-user?islogin=1';
+  const SHOP_ID_CHECK_URL = 'https://api.shopcity.vip/sail/seller/check-user';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/versions.json';
   const UPDATE_LAST_CHECK_KEY = 'xh_shopcity_fb_controller_update_last_check_v1';
   const UPDATE_MANIFEST_CACHE_KEY = 'xh_shopcity_fb_controller_update_manifest_v1';
@@ -334,6 +334,7 @@
     const preferredPaths = [
       ['data', 'current_shop_id'], ['data', 'currentShopId'],
       ['data', 'shop_id'], ['data', 'shopId'], ['data', 'shopid'],
+      ['data', 'id'], ['data', 'uid'],
       ['data', 'current_shop', 'id'], ['data', 'currentShop', 'id'],
       ['data', 'shop', 'id'], ['data', 'shopInfo', 'id'],
       ['data', 'user', 'shop_id'], ['data', 'user', 'shopId'],
@@ -379,14 +380,16 @@
 
   async function detectShopIdFromLogin() {
     try {
-      const response = await fetch(new URL(SHOP_ID_CHECK_URL, location.origin), {
-        method: 'GET',
+      const response = await fetch(SHOP_ID_CHECK_URL, {
+        method: 'POST',
         credentials: 'include',
         cache: 'no-store',
         headers: {
           Accept: 'application/json',
+          'content-type': 'application/json;charset=UTF-8',
           'x-requested-with': 'XMLHttpRequest',
         },
+        body: '{}',
       });
       if (!response.ok) return null;
       const result = await response.json();
