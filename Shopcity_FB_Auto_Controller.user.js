@@ -62,10 +62,10 @@
       cartProtectionSpend: 3,
       cartProtectionCount: 1,
       stages: {
-        1: { minFbClicks: 1, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
-        2: { minFbClicks: 2, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
-        3: { minFbClicks: 3, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
-        5: { minFbClicks: 4, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
+        1: { minFbClicks: 1, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
+        2: { minFbClicks: 2, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
+        3: { minFbClicks: 3, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
+        5: { minFbClicks: 4, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
       },
     },
   };
@@ -133,6 +133,7 @@
               minFbAddToCart: numberValue(stage?.minFbAddToCart ?? stage?.minAddToCart),
               minFbPurchases: numberValue(stage?.minFbPurchases),
               minVisitors: numberValue(stage?.minVisitors),
+              minViewContent: numberValue(stage?.minViewContent ?? stage?.minProductDetailVisitors),
               minAddToCart: numberValue(stage?.minFbAddToCart == null ? 0 : stage?.minAddToCart),
               minInitiateCheckout: numberValue(stage?.minInitiateCheckout),
               minOrders: numberValue(stage?.minOrders),
@@ -989,7 +990,7 @@
       'FB成效数': numberFrom(ad, ['fb_purchase_num']),
       'FB单次成效费用': numberFrom(ad, ['fb_cpa']),
       'SC访客数': numberFrom(ad, ['total_uv_num']),
-      'SC商详页访客数': numberFrom(ad, ['product_detail_uv_num', 'detail_uv_num']),
+      'SC商详页访客数': numberFrom(ad, ['view_content_uv_num', 'product_detail_uv_num', 'detail_uv_num']),
       'SC页面浏览次数': numberFrom(ad, ['page_view_num', 'pv_num']),
       'SC加购人数': numberFrom(ad, ['add_to_cart_uv_num']),
       'SC发起结账人数': numberFrom(ad, ['initiate_checkout_uv_num']),
@@ -1096,7 +1097,7 @@
       'FB成效总数': metrics.fb_purchase_num,
       'FB平均成效费用': metrics.fb_cpa,
       'SC访客总数': metrics.total_uv_num,
-      'SC商详页访客总数': metrics.product_detail_uv_num,
+      'SC商详页访客总数': metrics.view_content_uv_num,
       'SC页面浏览总数': metrics.page_view_num,
       'SC加购总人数': metrics.add_to_cart_uv_num,
       'SC发起结账总人数': metrics.initiate_checkout_uv_num,
@@ -1184,6 +1185,7 @@
       '操作时FB成效数': numberValue(metrics.fb_purchase_num),
       '操作时FB单次成效费用': numberValue(metrics.fb_cpa),
       '操作时SC访客数': numberValue(metrics.total_uv_num),
+      '操作时SC商详页访客数': numberValue(metrics.view_content_uv_num),
       '操作时SC加购人数': numberValue(metrics.add_to_cart_uv_num),
       '操作时SC发起结账人数': numberValue(metrics.initiate_checkout_uv_num),
       '操作时SC订单数': numberValue(metrics.total_order_num),
@@ -1255,6 +1257,7 @@
     const uniqueClicks = numberValue(ad.unique_link_click);
     const fbAddToCart = numberValue(ad.fb_add_to_cart);
     const visitors = numberValue(ad.total_uv_num);
+    const viewContent = numberFrom(ad, ['view_content_uv_num', 'product_detail_uv_num', 'detail_uv_num']);
     const purchases = numberValue(ad.fb_purchase_num);
     const addToCart = numberValue(ad.add_to_cart_uv_num);
     const initiateCheckout = numberValue(ad.initiate_checkout_uv_num);
@@ -1285,6 +1288,7 @@
       const minFbAddToCart = numberValue(stage.minFbAddToCart);
       const minFbPurchases = numberValue(stage.minFbPurchases);
       const minVisitors = numberValue(stage.minVisitors);
+      const minViewContent = numberValue(stage.minViewContent);
       const minAddToCart = numberValue(stage.minAddToCart);
       const minInitiateCheckout = numberValue(stage.minInitiateCheckout);
       const minOrders = numberValue(stage.minOrders);
@@ -1314,6 +1318,13 @@
           id: `STAGE_${reachedStage}_VISITORS`,
           category: 'ineffective',
           reason: `广告达到$${reachedStage}阶段，Shopcity访客 ${visitors} < 目标 ${minVisitors}`,
+        };
+      }
+      if (viewContent < minViewContent) {
+        return {
+          id: `STAGE_${reachedStage}_VIEW_CONTENT`,
+          category: 'ineffective',
+          reason: `广告达到$${reachedStage}阶段，Shopcity商详页访客 ${viewContent} < 目标 ${minViewContent}`,
         };
       }
       if (addToCart < minAddToCart) {
@@ -1347,6 +1358,7 @@
       fb_purchase_num: numberValue(ad.fb_purchase_num),
       fb_add_to_cart: numberValue(ad.fb_add_to_cart),
       total_uv_num: numberValue(ad.total_uv_num),
+      view_content_uv_num: numberFrom(ad, ['view_content_uv_num', 'product_detail_uv_num', 'detail_uv_num']),
       add_to_cart_uv_num: numberValue(ad.add_to_cart_uv_num),
       initiate_checkout_uv_num: numberValue(ad.initiate_checkout_uv_num),
       total_order_num: numberValue(ad.total_order_num),
@@ -1359,13 +1371,13 @@
   function sumMetrics(ads) {
     const keys = [
       'spend_usd', 'unique_link_click', 'fb_add_to_cart', 'fb_purchase_num',
-      'total_uv_num', 'add_to_cart_uv_num', 'initiate_checkout_uv_num', 'total_order_num',
-      'impressions', 'reach', 'product_detail_uv_num', 'page_view_num', 'sales_amount',
+      'total_uv_num', 'view_content_uv_num', 'add_to_cart_uv_num', 'initiate_checkout_uv_num', 'total_order_num',
+      'impressions', 'reach', 'page_view_num', 'sales_amount',
     ];
     const totals = Object.fromEntries(keys.map((key) => [key, 0]));
     for (const ad of ads) {
       for (const key of keys) {
-        if (key === 'product_detail_uv_num') totals[key] += numberFrom(ad, ['product_detail_uv_num', 'detail_uv_num']);
+        if (key === 'view_content_uv_num') totals[key] += numberFrom(ad, ['view_content_uv_num', 'product_detail_uv_num', 'detail_uv_num']);
         else if (key === 'page_view_num') totals[key] += numberFrom(ad, ['page_view_num', 'pv_num']);
         else if (key === 'sales_amount') totals[key] += numberFrom(ad, ['sales_amount', 'total_sales_amount', 'gmv']);
         else totals[key] += numberValue(ad[key]);
@@ -1771,6 +1783,7 @@
         [`$${spend}阶段FB最少加购`, config.policy.stages[spend].minFbAddToCart],
         [`$${spend}阶段FB最少成效`, config.policy.stages[spend].minFbPurchases],
         [`$${spend}阶段最少访客`, config.policy.stages[spend].minVisitors],
+        [`$${spend}阶段最少商详页访客`, config.policy.stages[spend].minViewContent],
         [`$${spend}阶段最少加购`, config.policy.stages[spend].minAddToCart],
         [`$${spend}阶段最少发起结账`, config.policy.stages[spend].minInitiateCheckout],
         [`$${spend}阶段最少订单`, config.policy.stages[spend].minOrders],
@@ -1796,6 +1809,9 @@
       }
       if (!Number.isInteger(Number(config.policy.stages[spend].minVisitors))) {
         throw new Error(`$${spend}阶段最少访客必须是整数`);
+      }
+      if (!Number.isInteger(Number(config.policy.stages[spend].minViewContent))) {
+        throw new Error(`$${spend}阶段最少商详页访客必须是整数`);
       }
       if (!Number.isInteger(Number(config.policy.stages[spend].minInitiateCheckout))) throw new Error(`$${spend}阶段最少发起结账必须是整数`);
       if (!Number.isInteger(Number(config.policy.stages[spend].minOrders))) throw new Error(`$${spend}阶段最少订单必须是整数`);
@@ -1891,6 +1907,7 @@
         minFbAddToCart: fieldNumber('.stage-fb-cart', row),
         minFbPurchases: fieldNumber('.stage-fb-purchases', row),
         minVisitors: fieldNumber('.stage-visitors', row),
+        minViewContent: fieldNumber('.stage-view-content', row),
         minAddToCart: fieldNumber('.stage-cart', row),
         minInitiateCheckout: fieldNumber('.stage-checkout', row),
         minOrders: fieldNumber('.stage-orders', row),
@@ -2007,6 +2024,7 @@
         <td class="metric-cell">${html(formatMetric(log, 'cost_per_unique_link_click_usd', 2))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'fb_add_to_cart', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'total_uv_num', 0))}</td>
+        <td class="metric-cell">${html(formatMetric(log, 'view_content_uv_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'fb_purchase_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'add_to_cart_uv_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'initiate_checkout_uv_num', 0))}</td>
@@ -2036,6 +2054,7 @@
         <td class="metric-cell">${html(formatMetric(log, 'fb_add_to_cart', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'fb_purchase_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'total_uv_num', 0))}</td>
+        <td class="metric-cell">${html(formatMetric(log, 'view_content_uv_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'add_to_cart_uv_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'initiate_checkout_uv_num', 0))}</td>
         <td class="metric-cell">${html(formatMetric(log, 'total_order_num', 0))}</td>
@@ -2063,7 +2082,7 @@
     const headers = [
       'time', 'execution_id', 'source', 'mode', 'action', 'success', 'account_id',
       'campaign_id', 'adset_id', 'ad_id', 'ad_name', 'matched_rule', 'reason',
-      'category', 'fb_purchase_num', 'fb_add_to_cart', 'total_uv_num', 'add_to_cart_uv_num',
+      'category', 'fb_purchase_num', 'fb_add_to_cart', 'total_uv_num', 'view_content_uv_num', 'add_to_cart_uv_num',
       'initiate_checkout_uv_num', 'total_order_num', 'fb_cpa', 'spend_usd', 'unique_link_click',
       'cost_per_unique_link_click_usd', 'message',
     ];
@@ -2124,7 +2143,7 @@
       #xh-fb-controller .stage-head,#xh-fb-controller .stage-row{display:grid;grid-template-columns:65px 1fr 1fr;gap:6px;align-items:center}
       #xh-fb-controller .stage-head.stage-four,#xh-fb-controller .stage-row.stage-four{grid-template-columns:65px 1fr 1fr 1fr}
       #xh-fb-controller .stage-table{overflow-x:auto;padding-bottom:3px}
-      #xh-fb-controller .stage-head.stage-nine,#xh-fb-controller .stage-row.stage-nine{grid-template-columns:90px repeat(7,135px) 44px;min-width:1120px}
+      #xh-fb-controller .stage-head.stage-ten,#xh-fb-controller .stage-row.stage-ten{grid-template-columns:90px repeat(8,135px) 44px;min-width:1260px}
       #xh-fb-controller .stage-head{font-size:11px;color:#737b91;margin-top:8px;text-align:center}
       #xh-fb-controller .stage-row{margin-top:5px}
       #xh-fb-controller .stage-row strong{text-align:center;color:#334269}
@@ -2181,14 +2200,15 @@
             <div><strong>判定规则：</strong>当前行所有启用条件中，任意一项低于最低数量，就判定命中关闭规则；观察模式只记录，正式模式才暂停。</div>
           </div>
           <div class="stage-table">
-            <div class="stage-head stage-nine"><span>花费检查点</span><span>FB最少单次链接点击数</span><span>FB最少加购数</span><span>FB最少成效数</span><span>最少访客数</span><span>最少加购数</span><span>最少发起结账数</span><span>最少订单数</span><span>操作</span></div>
+            <div class="stage-head stage-ten"><span>花费检查点</span><span>FB最少单次链接点击数</span><span>FB最少加购数</span><span>FB最少成效数</span><span>最少访客数</span><span>最少商详页访客数</span><span>最少加购数</span><span>最少发起结账数</span><span>最少订单数</span><span>操作</span></div>
             <div id="xh-stage-list">
-              ${Object.entries(config.policy.stages).sort(([a], [b]) => Number(a) - Number(b)).map(([spend, stage]) => `<div class="stage-row stage-nine stage-policy-row">
+              ${Object.entries(config.policy.stages).sort(([a], [b]) => Number(a) - Number(b)).map(([spend, stage]) => `<div class="stage-row stage-ten stage-policy-row">
                 <input class="stage-spend" type="number" min="0.01" step="0.01" value="${html(spend)}" title="花费检查点（USD）">
                 <input class="stage-fb-clicks" type="number" min="0" step="1" value="${html(stage.minFbClicks)}">
                 <input class="stage-fb-cart" type="number" min="0" step="1" value="${html(stage.minFbAddToCart)}">
                 <input class="stage-fb-purchases" type="number" min="0" step="1" value="${html(stage.minFbPurchases)}">
                 <input class="stage-visitors" type="number" min="0" step="1" value="${html(stage.minVisitors)}">
+                <input class="stage-view-content" type="number" min="0" step="1" value="${html(stage.minViewContent)}">
                 <input class="stage-cart" type="number" min="0" step="1" value="${html(stage.minAddToCart)}">
                 <input class="stage-checkout" type="number" min="0" step="1" value="${html(stage.minInitiateCheckout)}">
                 <input class="stage-orders" type="number" min="0" step="1" value="${html(stage.minOrders)}">
@@ -2263,9 +2283,9 @@
           <div><label>筛选广告账户ID</label><input id="xh-log-filter-account" placeholder="输入广告账户ID"></div>
           <div><label>筛选广告ID</label><input id="xh-log-filter-ad" placeholder="输入广告ID"></div>
         </div>
-        <div class="logs"><table><thead><tr><th>时间</th><th class="id-cell">广告账户ID</th><th class="id-cell">广告ID</th><th>广告名称</th><th class="metric-cell">花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">访客</th><th class="metric-cell">FB成效</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>动作</th><th>规则</th><th>结果</th></tr></thead><tbody id="xh-log-body"></tbody></table></div>
+        <div class="logs"><table><thead><tr><th>时间</th><th class="id-cell">广告账户ID</th><th class="id-cell">广告ID</th><th>广告名称</th><th class="metric-cell">花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">访客</th><th class="metric-cell">商详页访客</th><th class="metric-cell">FB成效</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>动作</th><th>规则</th><th>结果</th></tr></thead><tbody id="xh-log-body"></tbody></table></div>
         <div class="log-title">广告账户汇总统计</div>
-        <div class="logs"><table><thead><tr><th>执行时间</th><th class="id-cell">广告账户ID</th><th class="metric-cell">总花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">平均CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">FB成效</th><th class="metric-cell">访客</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>本轮处理情况</th></tr></thead><tbody id="xh-summary-body"></tbody></table></div>
+        <div class="logs"><table><thead><tr><th>执行时间</th><th class="id-cell">广告账户ID</th><th class="metric-cell">总花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">平均CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">FB成效</th><th class="metric-cell">访客</th><th class="metric-cell">商详页访客</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>本轮处理情况</th></tr></thead><tbody id="xh-summary-body"></tbody></table></div>
       </div>`;
     const panelBody = panel.querySelector('.body');
     panelBody.prepend(panel.querySelector('#xh-feishu-panel'));
@@ -2277,12 +2297,13 @@
     panel.querySelector('#xh-stage-add').addEventListener('click', () => {
       const rows = [...panel.querySelectorAll('#xh-stage-list .stage-policy-row')];
       const highest = Math.max(0, ...rows.map((row) => numberValue(row.querySelector('.stage-spend').value)));
-      panel.querySelector('#xh-stage-list').insertAdjacentHTML('beforeend', `<div class="stage-row stage-nine stage-policy-row">
+      panel.querySelector('#xh-stage-list').insertAdjacentHTML('beforeend', `<div class="stage-row stage-ten stage-policy-row">
         <input class="stage-spend" type="number" min="0.01" step="0.01" value="${highest + 1}" title="花费检查点（USD）">
         <input class="stage-fb-clicks" type="number" min="0" step="1" value="0">
         <input class="stage-fb-cart" type="number" min="0" step="1" value="0">
         <input class="stage-fb-purchases" type="number" min="0" step="1" value="0">
         <input class="stage-visitors" type="number" min="0" step="1" value="0">
+        <input class="stage-view-content" type="number" min="0" step="1" value="0">
         <input class="stage-cart" type="number" min="0" step="1" value="0">
         <input class="stage-checkout" type="number" min="0" step="1" value="0">
         <input class="stage-orders" type="number" min="0" step="1" value="0">
