@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-04T16:18:26Z",
+  "updated_at": "2026-09-05T14:09:17Z",
   "versions": [
     {
-      "version": "1.8.6",
+      "version": "1.8.7",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-05",
+      "review_status": "approved",
+      "changelog": [
+        "花费检测点新增最少商详页访客数",
+        "检测点规则支持view_content_uv_num字段",
+        "广告操作日志新增商详页访客列",
+        "广告账户汇总统计新增商详页访客列"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.7/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "4a5d686ae91a5b04e6e7f48bf988384fd2cc7cc08017fc4689e0733f3cf6891e"
+    },
+    {
+      "version": "1.8.6",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-05",
       "review_status": "approved",
