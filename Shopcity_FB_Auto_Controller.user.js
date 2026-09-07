@@ -31,6 +31,15 @@
   const UPDATE_MANIFEST_CACHE_KEY = 'xh_shopcity_fb_controller_update_manifest_v1';
   const UPDATE_CHECK_INTERVAL = 12 * 60 * 60 * 1000;
   const MAX_LOGS = 3000;
+  const PROTECTION_METRICS = [
+    { id: 'fb_purchase_num', label: 'FB成效', keys: ['fb_purchase_num'] },
+    { id: 'fb_initiate_checkout', label: 'FB发起结账', keys: ['fb_initiate_checkout', 'fb_initiate_checkout_num', 'fb_checkout_num'] },
+    { id: 'fb_add_to_cart', label: 'FB加购', keys: ['fb_add_to_cart'] },
+    { id: 'total_order_num', label: '店铺订单数', keys: ['total_order_num'] },
+    { id: 'initiate_checkout_uv_num', label: '店铺发起结账数', keys: ['initiate_checkout_uv_num'] },
+    { id: 'add_to_cart_uv_num', label: '店铺加购数', keys: ['add_to_cart_uv_num'] },
+    { id: 'view_content_uv_num', label: '店铺商详访客数', keys: ['view_content_uv_num', 'product_detail_uv_num', 'detail_uv_num'] },
+  ];
 
   const DEFAULT_CONFIG = {
     accountIds: [],
@@ -57,10 +66,10 @@
       maxReviews: 3,
     },
     policy: {
-      effectProtectionSpend: 6,
-      effectProtectionCount: 1,
-      cartProtectionSpend: 3,
-      cartProtectionCount: 1,
+      protectionRules: [
+        { metric: 'fb_purchase_num', minCount: 1, maxSpend: 6 },
+        { metric: 'fb_add_to_cart', minCount: 1, maxSpend: 3 },
+      ],
       stages: {
         1: { minFbClicks: 1, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
         2: { minFbClicks: 2, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
@@ -96,6 +105,59 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   }
 
+  function protectionMetricOption(metric) {
+    return PROTECTION_METRICS.find((option) => option.id === metric);
+  }
+
+  function normalizeProtectionRule(rule) {
+    const metric = String(rule?.metric || '').trim();
+    if (!protectionMetricOption(metric)) return null;
+    return {
+      metric,
+      minCount: numberValue(rule?.minCount),
+      maxSpend: numberValue(rule?.maxSpend),
+    };
+  }
+
+  function normalizeProtectionRules(policy) {
+    const source = Array.isArray(policy?.protectionRules)
+      ? policy.protectionRules
+      : [
+        {
+          metric: 'fb_purchase_num',
+          minCount: policy?.effectProtectionCount ?? DEFAULT_CONFIG.policy.protectionRules[0].minCount,
+          maxSpend: policy?.effectProtectionSpend ?? DEFAULT_CONFIG.policy.protectionRules[0].maxSpend,
+        },
+        {
+          metric: 'fb_add_to_cart',
+          minCount: policy?.cartProtectionCount ?? DEFAULT_CONFIG.policy.protectionRules[1].minCount,
+          maxSpend: policy?.cartProtectionSpend ?? DEFAULT_CONFIG.policy.protectionRules[1].maxSpend,
+        },
+      ];
+    return source.map(normalizeProtectionRule).filter(Boolean);
+  }
+
+  function protectionMetricValue(ad, metric) {
+    const option = protectionMetricOption(metric);
+    return option ? numberFrom(ad, option.keys) : 0;
+  }
+
+  function protectionMetricOptions(selectedMetric) {
+    return PROTECTION_METRICS.map((option) => (
+      `<option value="${html(option.id)}" ${option.id === selectedMetric ? 'selected' : ''}>${html(option.label)}</option>`
+    )).join('');
+  }
+
+  function renderProtectionRule(rule = DEFAULT_CONFIG.policy.protectionRules[0]) {
+    const normalized = normalizeProtectionRule(rule) || DEFAULT_CONFIG.policy.protectionRules[0];
+    return `<div class="protection-row protection-rule-row">
+      <select class="protection-metric">${protectionMetricOptions(normalized.metric)}</select>
+      <input class="protection-min-count" type="number" min="1" step="1" value="${html(normalized.minCount)}">
+      <input class="protection-max-spend" type="number" min="0" step="0.01" value="${html(normalized.maxSpend)}">
+      <button type="button" class="protection-delete" title="删除保护规则">删除</button>
+    </div>`;
+  }
+
   function normalizeConfig(value) {
     const policy = value?.policy || {};
     const stages = policy.stages || {};
@@ -126,6 +188,7 @@
       policy: {
         ...DEFAULT_CONFIG.policy,
         ...policy,
+        protectionRules: normalizeProtectionRules(policy),
         stages: Object.fromEntries(
           Object.entries(Object.keys(stages).length ? stages : DEFAULT_CONFIG.policy.stages)
             .map(([spend, stage]) => [String(numberValue(spend)), {
@@ -1264,19 +1327,11 @@
     const orders = numberValue(ad.total_order_num);
     const policy = config.policy;
 
-    if (
-      spend <= numberValue(policy.effectProtectionSpend) &&
-      purchases >= numberValue(policy.effectProtectionCount)
-    ) {
-      return null;
-    }
-
-    if (
-      spend <= numberValue(policy.cartProtectionSpend) &&
-      fbAddToCart >= numberValue(policy.cartProtectionCount)
-    ) {
-      return null;
-    }
+    const protectedRule = policy.protectionRules.find((rule) => (
+      spend <= numberValue(rule.maxSpend) &&
+      protectionMetricValue(ad, rule.metric) >= numberValue(rule.minCount)
+    ));
+    if (protectedRule) return null;
 
     const reachedStage = Object.keys(policy.stages)
       .map(numberValue)
@@ -1771,10 +1826,6 @@
     }
     if (config.feishu.enabled) validateFeishuConfig();
     const numericFields = [
-      ['成效保护花费', config.policy.effectProtectionSpend],
-      ['成效保护数量', config.policy.effectProtectionCount],
-      ['加购保护花费', config.policy.cartProtectionSpend],
-      ['加购保护数量', config.policy.cartProtectionCount],
       ['复核间隔分钟', config.review.delayMinutes],
       ['最多复核次数', config.review.maxReviews],
       ['任务执行间隔', config.intervalMinutes],
@@ -1816,11 +1867,15 @@
       if (!Number.isInteger(Number(config.policy.stages[spend].minInitiateCheckout))) throw new Error(`$${spend}阶段最少发起结账必须是整数`);
       if (!Number.isInteger(Number(config.policy.stages[spend].minOrders))) throw new Error(`$${spend}阶段最少订单必须是整数`);
     }
-    if (!Number.isInteger(Number(config.policy.cartProtectionCount))) {
-      throw new Error('加购保护数量必须是整数');
-    }
-    if (!Number.isInteger(Number(config.policy.effectProtectionCount)) || Number(config.policy.effectProtectionCount) < 1) {
-      throw new Error('成效保护最低数量必须是大于等于1的整数');
+    for (const [index, rule] of config.policy.protectionRules.entries()) {
+      const label = `第${index + 1}条广告保护规则`;
+      if (!protectionMetricOption(rule.metric)) throw new Error(`${label}请选择正确的保护指标`);
+      if (!Number.isFinite(Number(rule.maxSpend)) || Number(rule.maxSpend) < 0) {
+        throw new Error(`${label}的花费上限必须是大于等于0的数字`);
+      }
+      if (!Number.isInteger(Number(rule.minCount)) || Number(rule.minCount) < 1) {
+        throw new Error(`${label}的达到数量必须是大于等于1的整数`);
+      }
     }
     if (!Number.isInteger(Number(config.review.maxReviews)) || Number(config.review.maxReviews) < 1) {
       throw new Error('最多复核次数必须是大于等于1的整数');
@@ -1898,6 +1953,12 @@
       .map((value) => value.trim())
       .filter(Boolean);
     const fieldNumber = (selector, root = document) => Number(root.querySelector(selector).value);
+    const protectionRows = [...document.querySelectorAll('#xh-protection-list .protection-rule-row')];
+    const protectionRules = protectionRows.map((row) => ({
+      metric: row.querySelector('.protection-metric')?.value || '',
+      minCount: fieldNumber('.protection-min-count', row),
+      maxSpend: fieldNumber('.protection-max-spend', row),
+    }));
     const stageRows = [...document.querySelectorAll('#xh-stage-list .stage-policy-row')];
     if (!stageRows.length) throw new Error('至少保留一个检测点');
     const stageEntries = stageRows.map((row) => {
@@ -1943,10 +2004,7 @@
         maxReviews: fieldNumber('#xh-review-max'),
       },
       policy: {
-        effectProtectionSpend: fieldNumber('#xh-effect-protection-spend'),
-        effectProtectionCount: fieldNumber('#xh-effect-protection-count'),
-        cartProtectionSpend: fieldNumber('#xh-cart-protection-spend'),
-        cartProtectionCount: fieldNumber('#xh-cart-protection-count'),
+        protectionRules,
         stages: Object.fromEntries(stageEntries),
       },
     });
@@ -2140,6 +2198,10 @@
       #xh-fb-controller .input-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center}
       #xh-fb-controller .input-action button{padding:7px 9px;white-space:nowrap}
       #xh-fb-controller .field-status{display:block;min-height:16px;margin-top:3px;font-size:11px;line-height:1.35;color:#66718a}
+      #xh-fb-controller .protection-head,#xh-fb-controller .protection-row{display:grid;grid-template-columns:minmax(180px,1fr) 135px 135px 44px;gap:6px;align-items:center}
+      #xh-fb-controller .protection-head{font-size:11px;color:#737b91;margin-top:8px;text-align:center}
+      #xh-fb-controller .protection-row{margin-top:5px}
+      #xh-fb-controller .protection-delete{padding:7px 5px;background:#ffe9e9;color:#b72f2f}
       #xh-fb-controller .stage-head,#xh-fb-controller .stage-row{display:grid;grid-template-columns:65px 1fr 1fr;gap:6px;align-items:center}
       #xh-fb-controller .stage-head.stage-four,#xh-fb-controller .stage-row.stage-four{grid-template-columns:65px 1fr 1fr 1fr}
       #xh-fb-controller .stage-table{overflow-x:auto;padding-bottom:3px}
@@ -2183,21 +2245,17 @@
         <textarea id="xh-whitelist" placeholder="每行一个ad_id">${html(config.whitelist.join('\n'))}</textarea>
         <div class="policy">
           <div class="policy-title">广告保护与检测点</div>
-          <div class="two-cols">
-            <div><label>成效保护花费上限</label><input type="number" min="0" step="0.01" id="xh-effect-protection-spend" value="${html(config.policy.effectProtectionSpend)}"></div>
-            <div><label>成效保护最低数量</label><input type="number" min="1" step="1" id="xh-effect-protection-count" value="${html(config.policy.effectProtectionCount)}"></div>
+          <div class="protection-head"><span>保护指标</span><span>达到数量</span><span>花费上限</span><span>操作</span></div>
+          <div id="xh-protection-list">
+            ${config.policy.protectionRules.map((rule) => renderProtectionRule(rule)).join('')}
           </div>
-          <div class="policy-note">花费不超过保护上限且Facebook成效达到最低数量时，直接保留广告。</div>
-          <div class="two-cols">
-            <div><label>加购保护花费上限</label><input type="number" min="0" step="0.01" id="xh-cart-protection-spend" value="${html(config.policy.cartProtectionSpend)}"></div>
-            <div><label>加购保护最低数量</label><input type="number" min="0" step="1" id="xh-cart-protection-count" value="${html(config.policy.cartProtectionCount)}"></div>
-          </div>
-          <div class="policy-note">花费不超过保护上限且Facebook加购达到最低数量时，直接保留广告。</div>
+          <div class="stage-tools"><button type="button" id="xh-protection-add">＋ 新增保护规则</button></div>
+          <div class="policy-note">例如选择 FB成效，达到数量填 1，花费上限填 30，表示广告已有 1 个 FB成效时，在花费不超过 30 前直接保留广告，不执行检测点；超过 30 后继续按检测点判断。</div>
           <div class="checkpoint-help">
             <div><strong>花费检查点怎么生效：</strong>广告累计花费达到某个检查点后，脚本才会检查该行条件。</div>
             <div><strong>只执行最高档：</strong>例如花费为 $1.80，存在 $0.35 和 $1.60 两档时，只执行 $1.60 这一行。</div>
             <div><strong>数字 0 的含义：</strong>填写 0 代表该项不参与检查；填写大于 0 才表示需要达到的最低数量。</div>
-            <div><strong>判定规则：</strong>当前行所有启用条件中，任意一项低于最低数量，就判定命中关闭规则；观察模式只记录，正式模式才暂停。</div>
+            <div><strong>判定规则：</strong>任一广告保护规则命中后会直接保留；未命中保护时，当前检查点行所有启用条件中，任意一项低于最低数量，就判定命中关闭规则；观察模式只记录，正式模式才暂停。</div>
           </div>
           <div class="stage-table">
             <div class="stage-head stage-ten"><span>花费检查点</span><span>FB最少单次链接点击数</span><span>FB最少加购数</span><span>FB最少成效数</span><span>最少访客数</span><span>最少商详页访客数</span><span>最少加购数</span><span>最少发起结账数</span><span>最少订单数</span><span>操作</span></div>
@@ -2217,7 +2275,7 @@
             </div>
           </div>
           <div class="stage-tools"><button type="button" id="xh-stage-add">＋ 新增检测点</button></div>
-          <div class="policy-note">执行顺序：成效保护 → 加购保护 → 花费检查点。任一保护命中后，不再执行检查点判断。</div>
+          <div class="policy-note">执行顺序：广告保护规则 → 花费检查点。任一保护规则命中后，不再执行检测点判断。</div>
         </div>
         <div class="policy">
           <div class="policy-title">关闭后复核</div>
@@ -2293,6 +2351,19 @@
     document.body.appendChild(panel);
     applyPanelPosition(panel);
     makePanelDraggable(panel);
+
+    panel.querySelector('#xh-protection-add').addEventListener('click', () => {
+      panel.querySelector('#xh-protection-list').insertAdjacentHTML('beforeend', renderProtectionRule({
+        metric: 'fb_purchase_num',
+        minCount: 1,
+        maxSpend: 30,
+      }));
+    });
+    panel.querySelector('#xh-protection-list').addEventListener('click', (event) => {
+      const button = event.target.closest('.protection-delete');
+      if (!button) return;
+      button.closest('.protection-rule-row').remove();
+    });
 
     panel.querySelector('#xh-stage-add').addEventListener('click', () => {
       const rows = [...panel.querySelectorAll('#xh-stage-list .stage-policy-row')];
