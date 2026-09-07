@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-05T14:09:17Z",
+  "updated_at": "2026-09-07T00:42:54Z",
   "versions": [
     {
-      "version": "1.8.7",
+      "version": "1.8.8",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-07",
+      "review_status": "approved",
+      "changelog": [
+        "广告保护改为可增删的自定义规则列表",
+        "保护规则支持选择FB成效、FB发起结账、FB加购及店铺转化指标",
+        "保护规则按达到数量与花费上限判断，命中后直接保留广告",
+        "兼容旧版成效保护和加购保护配置并自动迁移为规则"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.8/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "8244f6eb8b1cd12763febf02cce62dc3656aceecfbebd57c381d98d8d69c0ada"
+    },
+    {
+      "version": "1.8.7",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-05",
       "review_status": "approved",
