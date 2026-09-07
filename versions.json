@@ -17,7 +17,7 @@
         "兼容旧版成效保护和加购保护配置并自动迁移为规则"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.8/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "8244f6eb8b1cd12763febf02cce62dc3656aceecfbebd57c381d98d8d69c0ada"
+      "sha256": "625542eade068123fec32baef2110047d7a504c0852de5ec392e68f957373232"
     },
     {
       "version": "1.8.7",
