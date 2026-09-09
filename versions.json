@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-09T19:53:42Z",
+  "updated_at": "2026-09-09T21:48:52Z",
   "versions": [
     {
-      "version": "1.8.13",
+      "version": "1.8.14",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-10",
+      "review_status": "approved",
+      "changelog": [
+        "新增账户时区0点自动开广告功能",
+        "支持打开所有已暂停且当日花费为0的广告，包括人工暂停广告",
+        "按广告账户time_zone查询当天暂停广告并记录每账户每天一次",
+        "观察模式只记录准备开启，正式模式才执行开启"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.14/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "87990dca3c04d9c8dddfea00babf982fdda3081988df3a2a0fccae65d418e57f"
+    },
+    {
+      "version": "1.8.13",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
