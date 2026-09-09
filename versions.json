@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-09T15:35:58Z",
+  "updated_at": "2026-09-09T15:50:41Z",
   "versions": [
     {
-      "version": "1.8.9",
+      "version": "1.8.10",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-09",
+      "review_status": "approved",
+      "changelog": [
+        "广告账户自动检测改用ShopCity原生页面接口",
+        "仅请求facebook-oauth/list和facebook-ads/list两个确定接口",
+        "移除账户检测时的猜测接口探测",
+        "继续仅对勾选的当前店铺广告账户执行任务和复核"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.10/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "721bdd9911809b888e999d50b71bc305bcf8d18570aab45766ad211a284a9011"
+    },
+    {
+      "version": "1.8.9",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-09",
       "review_status": "approved",
