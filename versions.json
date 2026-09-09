@@ -17,7 +17,7 @@
         "移除广告账户手动补充入口，仅执行当前店铺检测到账户"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.9/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "60abf18471760dbc31e703a7cde175111e371cf7b2354a9508a2936ab87e252e"
+      "sha256": "47e5e4bf3b3b39338d6b14cd200f866414ab029715dca8bb65a61295a77bb333"
     },
     {
       "version": "1.8.8",
