@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-09T16:00:29Z",
+  "updated_at": "2026-09-09T19:28:28Z",
   "versions": [
     {
-      "version": "1.8.11",
+      "version": "1.8.12",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-10",
+      "review_status": "approved",
+      "changelog": [
+        "广告账户列表新增FB授权账号显示",
+        "支持按FB账号、广告账户名称和广告账户ID搜索",
+        "搜索后全选和全不选仅作用于当前筛选结果",
+        "授权账号接口仅作为FB账号信息来源，广告账户仍来自facebook-ads/list"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.12/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "9385752ad1ab4f0366eb5c6cf9c8b4af1a728e6501852b315824cc5e6c5704ef"
+    },
+    {
+      "version": "1.8.11",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
