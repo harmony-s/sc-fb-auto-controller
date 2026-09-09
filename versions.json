@@ -2,11 +2,25 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-09T19:28:28Z",
+  "updated_at": "2026-09-09T19:53:42Z",
   "versions": [
     {
-      "version": "1.8.12",
+      "version": "1.8.13",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-10",
+      "review_status": "approved",
+      "changelog": [
+        "修复广告账户列表从facebook-ads/list嵌套fb_accounts识别FB授权账号",
+        "授权账号展示新增FB邮箱并支持邮箱搜索",
+        "修复搜索广告账户ID后非匹配账户仍显示的问题"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.13/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "04e58af3fbd0958ee20c30aaeb61c2223b0296fe618c2b1f7f19be623033fc65"
+    },
+    {
+      "version": "1.8.12",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
