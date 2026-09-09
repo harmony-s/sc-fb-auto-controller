@@ -2,11 +2,25 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-09T15:50:41Z",
+  "updated_at": "2026-09-09T16:00:29Z",
   "versions": [
     {
-      "version": "1.8.10",
+      "version": "1.8.11",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-10",
+      "review_status": "approved",
+      "changelog": [
+        "修复广告账户检测接口路径重复拼接问题",
+        "账户检测请求改为api.php?r=facebook-oauth/list和api.php?r=facebook-ads/list",
+        "广告数据读取、暂停和恢复接口继续使用原facebook-ads前缀"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.11/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "545973a1dcf7facf1bdc591d0be4af8859f2cf34fe41a6839b1171f9433942d0"
+    },
+    {
+      "version": "1.8.10",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-09",
       "review_status": "approved",
