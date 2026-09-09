@@ -2,11 +2,26 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-07T00:42:54Z",
+  "updated_at": "2026-09-09T15:35:58Z",
   "versions": [
     {
-      "version": "1.8.8",
+      "version": "1.8.9",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-09",
+      "review_status": "approved",
+      "changelog": [
+        "新增当前店铺绑定Facebook广告账户自动检测",
+        "检测到的广告账户可勾选选择是否执行任务",
+        "未勾选账户会跳过主任务和独立复核",
+        "移除广告账户手动补充入口，仅执行当前店铺检测到账户"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.9/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "60abf18471760dbc31e703a7cde175111e371cf7b2354a9508a2936ab87e252e"
+    },
+    {
+      "version": "1.8.8",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-07",
       "review_status": "approved",
