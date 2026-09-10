@@ -2,11 +2,27 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-10T13:29:44.337Z",
+  "updated_at": "2026-09-10T14:10:05.273Z",
   "versions": [
     {
-      "version": "1.8.15",
+      "version": "1.8.16",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-10",
+      "review_status": "approved",
+      "changelog": [
+        "FB账号快捷下拉只使用facebook-oauth/list授权账号接口结果",
+        "清理旧版由facebook-ads/list反推出的FB账号下拉缓存",
+        "广告账户列表新增ShopCity显示状态筛选，默认仅展示is_show不为0的账户",
+        "is_show=0账户默认不自动勾选执行，切到全部或隐藏账户后仍可手动选择",
+        "自动检测确认先请求facebook-oauth/list，再请求facebook-ads/list"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.16/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "bbd6ca30aa4cabb8c933d62b86b5ac867cebb48bd77bb11c0bfa02b17b1d373f"
+    },
+    {
+      "version": "1.8.15",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
