@@ -2,11 +2,27 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-09T21:48:52Z",
+  "updated_at": "2026-09-10T13:27:30.143Z",
   "versions": [
     {
-      "version": "1.8.14",
+      "version": "1.8.15",
       "channels": ["stable"],
+      "developer": "harmony-s",
+      "published_at": "2026-09-10",
+      "review_status": "approved",
+      "changelog": [
+        "账户定时自动开广告支持按账户时区选择小时和分钟",
+        "账户定时自动开广告支持配置广告已花费金额区间，默认仍为0到0",
+        "广告账户选择区新增FB授权账号快捷下拉筛选",
+        "检测、全选和全不选按钮移动到Facebook广告账户标题下方左侧",
+        "全选和全不选仅作用于当前显示的筛选结果，隐藏账户保留原勾选状态"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.15/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "51dc0ee047fb9a765864e3246c408f63e23f0e5b663f8d1bd39949b63b486d1f"
+    },
+    {
+      "version": "1.8.14",
+      "channels": ["historical"],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
