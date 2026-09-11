@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T18:30:32.340Z",
+  "updated_at": "2026-09-11T19:52:54.032Z",
   "versions": [
+    {
+      "version": "1.8.21",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-12",
+      "review_status": "approved",
+      "changelog": [
+        "系统设置只保留店铺登录状态守护和版本更新，Shop ID展示与自动获取移动到登录守护卡片下",
+        "自动化模块顶部新增任务执行区，集中配置任务执行间隔和运行模式",
+        "广告策略模块顶部新增白名单广告ID区，广告保护规则和花费检查点继续位于其后",
+        "优化花费检查点表格列宽、列间距和输入框间隔，减少宽表挤压",
+        "本版本仅调整UI模块归属和表格视觉间距，不改变API、配置存储、广告控制、飞书同步、复核、定时开广告或登录守护业务逻辑"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.21/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "f901b98dd9f568da8a9615d64202d0d2b3aa4524c25c45cb1b19f9c58dbc0088"
+    },
     {
       "version": "1.8.20",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-12",
