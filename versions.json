@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T00:44:46.363Z",
+  "updated_at": "2026-09-11T15:28:17.383Z",
   "versions": [
+    {
+      "version": "1.8.18",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-11",
+      "review_status": "approved",
+      "changelog": [
+        "新增店铺登录状态守护，登录过期后暂停广告操作",
+        "支持使用店铺账号和店铺密码自动登录，密码仅保存在脚本管理器独立存储",
+        "登录成功进入后台首页后自动回到/admin/conversion广告控制页",
+        "可配置登录检测间隔、连续失败判定次数和登录恢复后自动继续运行",
+        "登录页固定使用当前店铺域名的/admin/login，无需手动填写登录页网址"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.18/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "d5a172b37bc3268768a08854cbc0d7d376d7554502080f77017896eb95eba5d6"
+    },
     {
       "version": "1.8.17",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-11",
