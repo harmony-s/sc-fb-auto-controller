@@ -2,7 +2,7 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T00:43:24.767Z",
+  "updated_at": "2026-09-11T00:44:46.363Z",
   "versions": [
     {
       "version": "1.8.17",
@@ -19,7 +19,7 @@
         "检索框移动为单独一行，方便粘贴多行账户ID"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.17/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "ee2ae38f8bf65ad230ad6a68b9407a5870bcd7035c17ba3ab8a9bb0c8d344289"
+      "sha256": "56fda2ce0df3c383aab8b5c20ab653ece2ebbc28216238d2e0ee5fb66e612e8c"
     },
     {
       "version": "1.8.16",
