@@ -2,7 +2,7 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T18:02:44.049Z",
+  "updated_at": "2026-09-11T18:04:16.606Z",
   "versions": [
     {
       "version": "1.8.19",
@@ -20,7 +20,7 @@
         "修复UI重构后的样式作用域、宽表横向滚动、检测点表格宽度和长状态文本挤压问题"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.19/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "62a2c817886a706e1f379b8af215e42fad51770ec3ead278f302a4b2efc35ecf"
+      "sha256": "0b403441580e1d8694d9824fb32910dd692ae73517d6ba8c58e2707dec94fe64"
     },
     {
       "version": "1.8.18",
