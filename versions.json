@@ -2,11 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-10T14:10:05.273Z",
+  "updated_at": "2026-09-11T00:43:24.767Z",
   "versions": [
     {
+      "version": "1.8.17",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-11",
+      "review_status": "approved",
+      "changelog": [
+        "广告账户检索框支持一次粘贴多个广告账户ID进行筛选",
+        "多个广告账户ID可用换行、逗号、分号、顿号、竖线或空格分隔",
+        "支持act_或act-前缀的广告账户ID匹配",
+        "检索框移动为单独一行，方便粘贴多行账户ID"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.17/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "ee2ae38f8bf65ad230ad6a68b9407a5870bcd7035c17ba3ab8a9bb0c8d344289"
+    },
+    {
       "version": "1.8.16",
-      "channels": ["stable"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
@@ -22,7 +41,9 @@
     },
     {
       "version": "1.8.15",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
@@ -38,7 +59,9 @@
     },
     {
       "version": "1.8.14",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
@@ -53,7 +76,9 @@
     },
     {
       "version": "1.8.13",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
@@ -67,7 +92,9 @@
     },
     {
       "version": "1.8.12",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
@@ -82,7 +109,9 @@
     },
     {
       "version": "1.8.11",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-10",
       "review_status": "approved",
@@ -96,7 +125,9 @@
     },
     {
       "version": "1.8.10",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-09",
       "review_status": "approved",
@@ -111,7 +142,9 @@
     },
     {
       "version": "1.8.9",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-09",
       "review_status": "approved",
@@ -126,7 +159,9 @@
     },
     {
       "version": "1.8.8",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-07",
       "review_status": "approved",
@@ -141,7 +176,9 @@
     },
     {
       "version": "1.8.7",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-05",
       "review_status": "approved",
@@ -156,7 +193,9 @@
     },
     {
       "version": "1.8.6",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-05",
       "review_status": "approved",
@@ -171,7 +210,9 @@
     },
     {
       "version": "1.8.5",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-02",
       "review_status": "approved",
@@ -186,7 +227,9 @@
     },
     {
       "version": "1.8.4",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-02",
       "review_status": "approved",
@@ -201,7 +244,9 @@
     },
     {
       "version": "1.8.3",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-02",
       "review_status": "approved",
@@ -217,7 +262,9 @@
     },
     {
       "version": "1.8.2",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-01",
       "review_status": "approved",
@@ -232,7 +279,9 @@
     },
     {
       "version": "1.8.1",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-09-01",
       "review_status": "approved",
@@ -247,7 +296,9 @@
     },
     {
       "version": "1.8.0",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-08-31",
       "review_status": "approved",
@@ -262,7 +313,9 @@
     },
     {
       "version": "1.7.2",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-08-31",
       "review_status": "approved",
@@ -275,7 +328,9 @@
     },
     {
       "version": "1.7.1",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-08-31",
       "review_status": "approved",
@@ -289,7 +344,9 @@
     },
     {
       "version": "1.7.0",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-08-31",
       "review_status": "approved",
@@ -303,7 +360,9 @@
     },
     {
       "version": "1.6.0",
-      "channels": ["historical"],
+      "channels": [
+        "historical"
+      ],
       "developer": "harmony-s",
       "published_at": "2026-08-28",
       "review_status": "approved",
