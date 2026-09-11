@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T15:28:17.383Z",
+  "updated_at": "2026-09-11T18:02:44.049Z",
   "versions": [
+    {
+      "version": "1.8.19",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-12",
+      "review_status": "approved",
+      "changelog": [
+        "控制面板升级为SaaS风格Tab布局，按概览、广告账户、广告策略、自动化、飞书同步、运行日志和系统设置分区",
+        "新增概览卡片、顶部状态镜像和底部固定操作栏，启动、停止、手动执行和保存保持常驻可见",
+        "广告账户列表改为表格展示，保留账户选择、FB授权信息、ShopCity显示状态筛选和多ID检索能力",
+        "广告保护、花费检测点、复核、定时开广告和登录守护改为更清晰的模块化布局，不改变执行规则",
+        "修复UI重构后的样式作用域、宽表横向滚动、检测点表格宽度和长状态文本挤压问题"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.19/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "62a2c817886a706e1f379b8af215e42fad51770ec3ead278f302a4b2efc35ecf"
+    },
     {
       "version": "1.8.18",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-11",
