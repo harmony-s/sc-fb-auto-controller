@@ -2,7 +2,7 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T19:52:54.032Z",
+  "updated_at": "2026-09-11T19:54:05.432Z",
   "versions": [
     {
       "version": "1.8.21",
@@ -20,7 +20,7 @@
         "本版本仅调整UI模块归属和表格视觉间距，不改变API、配置存储、广告控制、飞书同步、复核、定时开广告或登录守护业务逻辑"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.21/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "f901b98dd9f568da8a9615d64202d0d2b3aa4524c25c45cb1b19f9c58dbc0088"
+      "sha256": "55d08e564f76eeb01000a939bbc8d2ac2217b60bfba453078a449b40c520b584"
     },
     {
       "version": "1.8.20",
