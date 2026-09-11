@@ -2,12 +2,31 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T18:04:16.606Z",
+  "updated_at": "2026-09-11T18:30:32.340Z",
   "versions": [
+    {
+      "version": "1.8.20",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-12",
+      "review_status": "approved",
+      "changelog": [
+        "统一七个Tab的页面标题、辅助说明和页面级操作区",
+        "新增内容宽度容器，自动化、飞书同步和系统设置页面更紧凑易读",
+        "概览Dashboard改为八个KPI卡片加系统状态卡，本轮检查不再显示长句截断",
+        "优化广告账户筛选栏、账户表格、日志表格和检测点表格的对齐、行高、列宽与滚动表现",
+        "重排自动化、飞书同步、系统设置表单，统一输入框、单位、按钮、focus和状态颜色视觉规范",
+        "本版本仅做UI/UX精修，不改变API、配置存储、广告控制、飞书同步、复核或定时开广告业务逻辑"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.20/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "275a47b274bd5b7f9e341c112e0b4ec26b4b989ba1567f1ed6bd66fd710ccfb7"
+    },
     {
       "version": "1.8.19",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-12",
