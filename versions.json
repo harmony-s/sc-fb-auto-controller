@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-11T19:54:05.432Z",
+  "updated_at": "2026-09-12T16:00:00.000Z",
   "versions": [
+    {
+      "version": "1.8.22",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-13",
+      "review_status": "approved",
+      "changelog": [
+        "修复广告账户迁移到新FB授权账号后，脚本面板仍显示旧授权账号的问题",
+        "自动检测当前店铺账户时，facebook-ads/list返回结果作为当前店铺广告账户的权威展示数据",
+        "页面元素和浏览器存储中的账户发现只在接口没有返回账户时作为兜底",
+        "重新检测会保留仍存在广告账户的勾选状态，并自动勾选新检测到的ShopCity展示账户",
+        "本版本不改变接口、配置存储、广告暂停/开启、飞书同步、复核、定时开广告或登录守护业务逻辑"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.22/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "17ffde197f1a8fabf8021d75b9a8447d22cd12682e2907c2c0a21fdcc758e93f"
+    },
     {
       "version": "1.8.21",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-12",
