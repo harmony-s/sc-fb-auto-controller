@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-12T16:00:00.000Z",
+  "updated_at": "2026-09-14T16:00:00.000Z",
   "versions": [
+    {
+      "version": "1.8.23",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-15",
+      "review_status": "approved",
+      "changelog": [
+        "花费检查点支持同一花费金额配置多行条件",
+        "同一行内多个启用指标仍按全部达标判断，同花费多行之间按任一行达标判断",
+        "例如花费5刀时可用两行表达FB加购>=1或发起结账>=1，任意一行达标即保留广告",
+        "取消保存时的重复花费检查点拦截，改为按花费金额分组保存和执行",
+        "旧版单行检查点自动兼容为一行规则组，原有配置行为保持不变"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.23/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "37d383437e19de850a9cb319ba437ff2abd5ce5b063de060dbf9c3f01b6c6194"
+    },
     {
       "version": "1.8.22",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-13",
