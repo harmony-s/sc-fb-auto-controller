@@ -5,9 +5,27 @@
   "updated_at": "2026-09-15T16:00:00.000Z",
   "versions": [
     {
-      "version": "1.8.24",
+      "version": "1.8.25",
       "channels": [
         "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-16",
+      "review_status": "approved",
+      "changelog": [
+        "恢复广告后增加实际状态验证，只有重新读取到广告状态为ACTIVE才记录开启成功",
+        "修复被审核驳回或不可投放广告接口返回成功但实际仍未开启时，操作日志误显示成功的问题",
+        "主任务复核中开启后仍非ACTIVE的广告会计为失败，并占用当天复核次数上限，避免同一天反复尝试",
+        "账户定时自动开广告同样增加开启后状态验证，非ACTIVE结果记录失败但不阻塞整个账户当天完成",
+        "活动/关闭广告统计改用status、ad_status、effective_status、configured_status多字段兜底识别"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.25/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "cc177f497b550d91d4aafe8864daa8d2c43318bb2f2b043b214a0a6b2565a79a"
+    },
+    {
+      "version": "1.8.24",
+      "channels": [
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-16",
