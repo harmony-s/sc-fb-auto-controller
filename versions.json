@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-14T16:00:00.000Z",
+  "updated_at": "2026-09-15T16:00:00.000Z",
   "versions": [
+    {
+      "version": "1.8.24",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-16",
+      "review_status": "approved",
+      "changelog": [
+        "关闭广告复核改为随每轮主任务执行，不再使用独立复核计时器",
+        "主任务每轮读取当日全部广告，活动广告命中规则时暂停，关闭广告不命中关闭规则时恢复",
+        "人工关闭和脚本关闭的PAUSED广告都纳入同一套复核规则",
+        "复核顺序继续沿用白名单、广告保护规则、最高花费检查点的主任务判定",
+        "移除复核间隔配置，保留每个广告每天最大复核次数，达到上限后当天跳过，次日重新计数"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.24/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "55494f162fc1be0c02d19d5feb7896ec659718dcea02a98af254de3f5eb1f0c2"
+    },
     {
       "version": "1.8.23",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-15",
