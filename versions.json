@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-15T16:00:00.000Z",
+  "updated_at": "2026-09-16T00:04:47.222Z",
   "versions": [
+    {
+      "version": "1.8.26",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-16",
+      "review_status": "approved",
+      "changelog": [
+        "自动化的任务执行区新增主任务数据时区配置，可选择洛杉矶时区或广告账户自身时区",
+        "主任务关闭检测、关闭广告复核和复核后开启验证会按所选时区传递start_date、end_date和time_zone",
+        "默认仍使用America/Los_Angeles，旧配置升级后不会改变现有花费检查口径",
+        "选择广告账户时区时，每个账户的复核次数按该账户本地数据日期计数",
+        "操作日志、CSV导出和飞书主任务同步补充实际数据日期与数据时区，便于复盘口径"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.26/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "f25bd688169a6e8e7bdcf39ace970fd84857aefce6982c47e60315dcd1992cba"
+    },
     {
       "version": "1.8.25",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-16",
