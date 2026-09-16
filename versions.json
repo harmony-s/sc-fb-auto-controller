@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-16T00:04:47.222Z",
+  "updated_at": "2026-09-16T16:48:48.280Z",
   "versions": [
+    {
+      "version": "1.8.27",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-17",
+      "review_status": "approved",
+      "changelog": [
+        "广告策略白名单升级为广告账户ID、广告系列ID、广告组ID和广告ID四个层级",
+        "命中任意白名单层级时，脚本仍读取广告数据并保持现有飞书同步，但不会自动暂停、复核开启或定时开启",
+        "旧版白名单广告ID配置会自动迁移到新的广告ID白名单，不需要重新填写",
+        "白名单日志会说明命中的层级和ID，定时自动开广告新增白名单跳过日志动作",
+        "运行日志筛选新增复核白名单跳过和定时白名单跳过动作"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.27/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "8842c77850362015666e97334ee1658210897ac58e46a91af0c0b29797b8c4b3"
+    },
     {
       "version": "1.8.26",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-16",
