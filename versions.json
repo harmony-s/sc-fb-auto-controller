@@ -20,7 +20,7 @@
         "操作日志、CSV导出和飞书主任务同步补充实际数据日期与数据时区，便于复盘口径"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.26/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "f25bd688169a6e8e7bdcf39ace970fd84857aefce6982c47e60315dcd1992cba"
+      "sha256": "a5dd358d5221d28bb37b7138ce1db09d9cfd4ead86b440b1bce397574ac40aa7"
     },
     {
       "version": "1.8.25",
