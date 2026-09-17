@@ -2,12 +2,29 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-17T10:39:41.925Z",
+  "updated_at": "2026-09-17T11:58:55.336Z",
   "versions": [
+    {
+      "version": "1.8.31",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-17",
+      "review_status": "approved",
+      "changelog": [
+        "从Tampermonkey安装确认页返回ShopCity后自动刷新页面，使新版本立即初始化",
+        "安装页打开前挂载一次性焦点与页面可见性监听，兼容切换标签页和切换窗口",
+        "自动刷新监听最长保留10分钟，触发一次后立即清理，避免后续普通切换页面再次刷新",
+        "安装页无法打开时会取消监听；取消安装后返回最多产生一次无害刷新"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.31/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "6c3b190afca109c803ef602c072c1d8e689dbb48ef1a21f2b1b55f0ba3b56b70"
+    },
     {
       "version": "1.8.30",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-17",
