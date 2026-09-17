@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-16T16:48:48.280Z",
+  "updated_at": "2026-09-17T09:31:51.931Z",
   "versions": [
+    {
+      "version": "1.8.28",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-17",
+      "review_status": "approved",
+      "changelog": [
+        "修复店铺自动登录后停留在/admin/首页时不会稳定返回广告控制页的问题",
+        "脚本会记住用户已启动循环的状态，页面刷新后自动确认登录并恢复运行",
+        "登录过期暂停不会清除启动意图，登录恢复后可继续运行；用户点击停止会清除该状态",
+        "首页登录恢复桥接会在确认登录成功后返回/admin/conversion",
+        "登录状态守护说明补充刷新后自动恢复运行的行为"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.28/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "5243769895a616de34c95bb4b74331fb3054c2e977583f6f0e60a3682684d839"
+    },
     {
       "version": "1.8.27",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-17",
