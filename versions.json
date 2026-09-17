@@ -2,12 +2,29 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-17T10:00:58.748Z",
+  "updated_at": "2026-09-17T10:39:41.925Z",
   "versions": [
+    {
+      "version": "1.8.30",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-17",
+      "review_status": "approved",
+      "changelog": [
+        "修复概览模块的下次执行卡片只显示渲染时快照、不会随倒计时变化的问题",
+        "标题栏、概览卡片和底部状态栏现在共用同一个倒计时更新源",
+        "倒计时每秒仅更新对应文本，不会每秒重建整个概览模块",
+        "未启动、本轮执行中、等待调度和分秒倒计时四种状态保持同步"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.30/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "efb9a0516b10674aaa1feebccb2df37d6e0597fde03958795601dfb3d5ea2810"
+    },
     {
       "version": "1.8.29",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-17",
