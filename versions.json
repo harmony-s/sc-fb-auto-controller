@@ -2,12 +2,29 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-17T09:31:51.931Z",
+  "updated_at": "2026-09-17T10:00:58.748Z",
   "versions": [
+    {
+      "version": "1.8.29",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-09-17",
+      "review_status": "approved",
+      "changelog": [
+        "修复ShopCity登录成功后仅通过前端路由停留在/admin/、旧登录页脚本不重新初始化的问题",
+        "自动提交登录表单后持续检测登录状态，最长等待60秒，兼容无整页刷新的登录跳转",
+        "确认登录成功后清除登录重试状态并强制进入/admin/conversion，使控制面板正常创建",
+        "保留刷新恢复循环和登录恢复续跑行为；遇到验证码或安全校验时仍停止自动登录并提示人工处理"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.29/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "f427a5210d761e0d309e916523c50cfd829197cc550952c8b7936f6f82fcb97b"
+    },
     {
       "version": "1.8.28",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-17",
