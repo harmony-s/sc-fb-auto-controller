@@ -2,12 +2,31 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-09-17T11:58:55.336Z",
+  "updated_at": "2026-10-10T16:16:21.511Z",
   "versions": [
+    {
+      "version": "1.8.32",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-10-11",
+      "review_status": "approved",
+      "changelog": [
+        "花费检查点保存时要求至少存在一个正数检查点，并禁止所有指标均为0的空规则",
+        "关闭广告低于首个检查点时保持暂停且不消耗复核次数，同一广告、日期和首检查点只记录一次数据不足日志",
+        "关闭广告复核和账户定时自动开广告开关改为即时保存并停止尚未处理的广告",
+        "增加同店铺单页面执行锁，避免多个ShopCity标签页重复执行广告操作",
+        "概览和运行日志分别展示复核开启、定时开启及当前执行页面",
+        "广告策略变化后通过规则版本标识重置暂停广告的当日复核资格"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.32/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "469a0f0abc9a5c74ed09a6ab9ead2f78ba6bce33b2dd784b7fd67520dfeb95de"
+    },
     {
       "version": "1.8.31",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-09-17",

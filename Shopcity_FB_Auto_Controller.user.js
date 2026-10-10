@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shopcity Facebook 广告自动控制器
 // @namespace    xh-shopcity
-// @version      1.8.31
-// @description  支持Tampermonkey确认更新返回后自动刷新页面。
+// @version      1.8.32
+// @description  强化复核门槛、即时开关与单页面执行保护。
 // @match        https://*.shopcity.vip/admin*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -27,7 +27,7 @@
   const FEISHU_SECRET_KEY = 'xh_shopcity_fb_controller_feishu_secret_v1';
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-  const CURRENT_VERSION = '1.8.31';
+  const CURRENT_VERSION = '1.8.32';
   const SHOP_ID_CHECK_URL = 'https://api.shopcity.vip/sail/seller/check-user';
   const LOGIN_PASSWORD_KEY_PREFIX = 'xh_shopcity_fb_controller_login_password_v1_';
   const LOGIN_RETURN_URL_KEY = 'xh_shopcity_fb_controller_login_return_url_v1';
@@ -35,6 +35,9 @@
   const LOGIN_ATTEMPT_KEY = 'xh_shopcity_fb_controller_login_attempt_v1';
   const LOGIN_LAST_LOG_KEY = 'xh_shopcity_fb_controller_login_last_log_v1';
   const RUN_INTENT_KEY = 'xh_shopcity_fb_controller_run_intent_v1';
+  const RUNNER_LOCK_KEY_PREFIX = 'xh_shopcity_fb_controller_runner_lock_v1_';
+  const RUNNER_LOCK_TTL_MS = 120000;
+  const RUNNER_HEARTBEAT_MS = 10000;
   const CONVERSION_PATH = '/admin/conversion';
   const LOGIN_PATH = '/admin/login';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/versions.json';
@@ -42,6 +45,11 @@
   const UPDATE_MANIFEST_CACHE_KEY = 'xh_shopcity_fb_controller_update_manifest_v1';
   const UPDATE_CHECK_INTERVAL = 12 * 60 * 60 * 1000;
   const MAX_LOGS = 3000;
+  const INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const STAGE_METRIC_KEYS = [
+    'minFbClicks', 'minFbAddToCart', 'minFbPurchases', 'minVisitors',
+    'minViewContent', 'minAddToCart', 'minInitiateCheckout', 'minOrders',
+  ];
   const PROTECTION_METRICS = [
     { id: 'fb_purchase_num', label: 'FB成效', keys: ['fb_purchase_num'] },
     { id: 'fb_initiate_checkout', label: 'FB发起结账', keys: ['fb_initiate_checkout', 'fb_initiate_checkout_num', 'fb_checkout_num'] },
@@ -123,6 +131,10 @@
   let countdownId = null;
   let zeroReopenTimerId = null;
   let zeroReopenExecuting = false;
+  let reviewExecutionVersion = 0;
+  let zeroReopenExecutionVersion = 0;
+  let runnerHeartbeatId = null;
+  let lastRunnerPageLabel = '';
   let loginGuardTimerId = null;
   let loginGuardExecuting = false;
   let loginGuardFailCount = 0;
@@ -153,6 +165,91 @@
 
   function shouldRestoreRun() {
     return localStorage.getItem(RUN_INTENT_KEY) === '1';
+  }
+
+  function runnerLockKey() {
+    return `${RUNNER_LOCK_KEY_PREFIX}${currentShopHost()}`;
+  }
+
+  function readRunnerLease() {
+    try {
+      const lease = JSON.parse(localStorage.getItem(runnerLockKey()) || 'null');
+      return lease && typeof lease === 'object' ? lease : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function validRunnerLease(lease, now = Date.now()) {
+    return Boolean(lease?.instance_id && numberValue(lease.expires_at) > now);
+  }
+
+  function ownsRunnerLease() {
+    const lease = readRunnerLease();
+    return validRunnerLease(lease) && lease.instance_id === INSTANCE_ID;
+  }
+
+  function runnerPageLabel() {
+    const lease = readRunnerLease();
+    if (!validRunnerLease(lease)) return running || executing || zeroReopenExecuting ? '本页面' : '未运行';
+    return lease.instance_id === INSTANCE_ID ? '本页面' : '其他页面';
+  }
+
+  function writeRunnerLease() {
+    const now = Date.now();
+    localStorage.setItem(runnerLockKey(), JSON.stringify({
+      instance_id: INSTANCE_ID,
+      shop_id: String(config.shopId || ''),
+      updated_at: now,
+      expires_at: now + RUNNER_LOCK_TTL_MS,
+    }));
+  }
+
+  function acquireRunnerLease() {
+    const current = readRunnerLease();
+    if (validRunnerLease(current) && current.instance_id !== INSTANCE_ID) return false;
+    writeRunnerLease();
+    return ownsRunnerLease();
+  }
+
+  function clearRunnerHeartbeat() {
+    if (runnerHeartbeatId) window.clearInterval(runnerHeartbeatId);
+    runnerHeartbeatId = null;
+  }
+
+  function handleRunnerLeaseLost() {
+    if (!running && !executing && !zeroReopenExecuting) return;
+    running = false;
+    reviewExecutionVersion += 1;
+    zeroReopenExecutionVersion += 1;
+    clearScheduledRun();
+    clearScheduledZeroReopen();
+    clearRunnerHeartbeat();
+    setStatus('任务已转由其他页面执行，本页面停止广告操作', 'idle');
+    updateButtons();
+  }
+
+  function startRunnerHeartbeat() {
+    clearRunnerHeartbeat();
+    runnerHeartbeatId = window.setInterval(() => {
+      if (!running && !executing && !zeroReopenExecuting) {
+        clearRunnerHeartbeat();
+        return;
+      }
+      if (!ownsRunnerLease()) {
+        handleRunnerLeaseLost();
+        return;
+      }
+      writeRunnerLease();
+      renderOverview();
+    }, RUNNER_HEARTBEAT_MS);
+  }
+
+  function releaseRunnerLease() {
+    const key = runnerLockKey();
+    const lease = readRunnerLease();
+    if (lease?.instance_id === INSTANCE_ID) localStorage.removeItem(key);
+    clearRunnerHeartbeat();
   }
 
   function currentShopHost() {
@@ -254,6 +351,50 @@
   function stageRulesForSpend(stages, spend) {
     const stage = stages?.[String(numberValue(spend))] ?? stages?.[String(spend)];
     return Array.isArray(stage) ? stage : stage ? [stage] : [];
+  }
+
+  function spendCheckpoints(stages) {
+    return Object.keys(stages || {})
+      .map(numberValue)
+      .filter((checkpoint) => checkpoint > 0)
+      .sort((a, b) => a - b);
+  }
+
+  function highestReachedSpendCheckpoint(stages, spend) {
+    return spendCheckpoints(stages).filter((checkpoint) => spend >= checkpoint).at(-1) || 0;
+  }
+
+  function lowestSpendCheckpoint(stages) {
+    return spendCheckpoints(stages)[0] || 0;
+  }
+
+  function stageRuleHasEnabledMetric(stage) {
+    return STAGE_METRIC_KEYS.some((key) => numberValue(stage?.[key]) > 0);
+  }
+
+  function stableSerialize(value) {
+    if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+    if (value && typeof value === 'object') {
+      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value);
+  }
+
+  function hashText(value) {
+    let hash = 2166136261;
+    for (const character of String(value || '')) {
+      hash ^= character.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function reviewPolicyFingerprint() {
+    return `review-v4-${hashText(stableSerialize({
+      whitelist: normalizeWhitelist(config.whitelist),
+      protectionRules: config.policy.protectionRules,
+      stages: config.policy.stages,
+    }))}`;
   }
 
   function stageRuleEntries(stages) {
@@ -2178,13 +2319,13 @@
   function operationName(action) {
     return ({
       WOULD_PAUSE: '准备暂停', PAUSE: '已暂停', WHITELIST_SKIP: '白名单跳过',
-      WOULD_REOPEN: '准备恢复', REOPEN: '已恢复', REVIEW_KEEP_PAUSED: '复核保持暂停',
+      WOULD_REOPEN: '准备复核开启', REOPEN: '复核已开启', REVIEW_KEEP_PAUSED: '复核保持暂停',
       REVIEW_REOPEN_LIMIT: '复核次数超限', REVIEW_NOT_FOUND: '复核未找到广告',
       REVIEW_WHITELIST_SKIP: '白名单跳过',
       WOULD_REOPEN_ZERO_SPEND: '准备0点开启', REOPEN_ZERO_SPEND: '0点已开启',
       WOULD_REOPEN_SCHEDULED_SPEND: '准备定时开启', REOPEN_SCHEDULED_SPEND: '定时已开启',
       SCHEDULED_REOPEN_WHITELIST_SKIP: '定时白名单跳过',
-    })[action] || '执行失败';
+    })[action] || String(action || '执行失败');
   }
 
   function isAdOperation(action) {
@@ -2323,10 +2464,7 @@
     ));
     if (protectedRule) return null;
 
-    const reachedStage = Object.keys(policy.stages)
-      .map(numberValue)
-      .filter((checkpoint) => checkpoint > 0 && spend >= checkpoint)
-      .sort((a, b) => b - a)[0];
+    const reachedStage = highestReachedSpendCheckpoint(policy.stages, spend);
     if (reachedStage) {
       const failures = [];
       const rules = stageRulesForSpend(policy.stages, reachedStage);
@@ -2461,6 +2599,8 @@
       review_date: dataDate,
       review_count: 0,
       review_done: false,
+      review_policy_version: reviewPolicyFingerprint(),
+      below_checkpoint_log_key: '',
       close_rule: rule.id,
     };
     saveManagedAds(managed);
@@ -2470,33 +2610,45 @@
     const key = managedKey(accountId, ad.ad_id);
     const previous = managed[key] || {};
     const sameDate = previous.review_date === dataDate;
+    const policyVersion = reviewPolicyFingerprint();
+    const samePolicy = previous.review_policy_version === policyVersion;
+    const sameReviewContext = sameDate && samePolicy;
     managed[key] = {
       ...previous,
       account_id: String(accountId),
       ad_id: String(ad.ad_id),
       ad_name: String(ad.ad_name || previous.ad_name || ''),
-      state: previous.state || 'paused_review',
+      state: sameReviewContext ? (previous.state || 'paused_review') : 'paused_review',
       stats_date: dataDate,
       review_date: dataDate,
-      review_count: sameDate ? numberValue(previous.review_count) : 0,
+      review_count: sameReviewContext ? numberValue(previous.review_count) : 0,
       review_done: false,
+      review_policy_version: policyVersion,
+      below_checkpoint_log_key: sameDate ? String(previous.below_checkpoint_log_key || '') : '',
       ...updates,
     };
     return managed[key];
   }
 
   async function reviewPausedAds(accountId, pausedAds, executionId, source, dataDate = pacificDate(), timeZone = 'America/Los_Angeles') {
-    const result = { reviewed: 0, reopened: 0, kept: 0, skipped: 0, failed: 0 };
+    const result = { reviewed: 0, reopened: 0, kept: 0, skipped: 0, failed: 0, cancelled: false };
     if (!config.review.enabled) return result;
 
     const managed = getManagedAds();
     const maxReviews = numberValue(config.review.maxReviews);
+    const executionVersion = reviewExecutionVersion;
 
     for (const ad of pausedAds) {
+      if (!config.review.enabled || executionVersion !== reviewExecutionVersion || !ownsRunnerLease()) {
+        result.cancelled = true;
+        break;
+      }
       const adId = String(ad.ad_id || '');
       const previous = managed[managedKey(accountId, adId)] || {};
-      const alreadySkippedWhitelist = previous.review_date === dataDate && previous.state === 'review_skipped_whitelist';
       const current = updatePausedReviewRecord(managed, accountId, ad, dataDate);
+      const alreadySkippedWhitelist = previous.review_date === dataDate
+        && previous.review_policy_version === current.review_policy_version
+        && previous.state === 'review_skipped_whitelist';
       const whitelist = whitelistMatch(ad, accountId);
 
       const baseLog = {
@@ -2519,7 +2671,7 @@
         current.state = 'review_skipped_whitelist';
         saveManagedAds(managed);
         if (!alreadySkippedWhitelist) {
-          addLog({ ...baseLog, action: 'REVIEW_WHITELIST_SKIP', success: true, message: `复核时命中白名单${whitelist.label} ${whitelist.id}，保持关闭且不自动恢复` });
+          addLog({ ...baseLog, action: 'REVIEW_WHITELIST_SKIP', success: true, message: `复核时命中白名单${whitelist.label} ${whitelist.id}，保持关闭且不自动开启` });
         }
         continue;
       }
@@ -2533,6 +2685,34 @@
       }
 
       result.reviewed += 1;
+      const spend = numberValue(ad.spend_usd);
+      const firstCheckpoint = lowestSpendCheckpoint(config.policy.stages);
+      const reachedCheckpoint = highestReachedSpendCheckpoint(config.policy.stages, spend);
+
+      if (!reachedCheckpoint) {
+        current.review_rule = 'BELOW_FIRST_CHECKPOINT';
+        result.kept += 1;
+        current.review_done = false;
+        current.state = 'review_below_first_checkpoint';
+        const thresholdText = firstCheckpoint > 0 ? `$${firstCheckpoint}` : '有效花费检查点';
+        const belowCheckpointLogKey = `${dataDate}|${firstCheckpoint}`;
+        if (current.below_checkpoint_log_key !== belowCheckpointLogKey) {
+          current.below_checkpoint_log_key = belowCheckpointLogKey;
+          addLog({
+            ...baseLog,
+            action: 'REVIEW_KEEP_PAUSED',
+            matched_rule: 'BELOW_FIRST_CHECKPOINT',
+            category: 'insufficient_data',
+            reason: `广告花费 $${spend.toFixed(2)} 尚未达到首个花费检查点 ${thresholdText}`,
+            success: true,
+            message: '复核数据不足，保持关闭且不消耗复核次数；达到首个检查点后再继续判断',
+          });
+        }
+        saveManagedAds(managed);
+        continue;
+      }
+
+      current.below_checkpoint_log_key = '';
       current.review_count = numberValue(current.review_count) + 1;
       const latestRule = matchRule(ad);
 
@@ -2568,6 +2748,12 @@
         continue;
       }
 
+      if (!config.review.enabled || executionVersion !== reviewExecutionVersion || !ownsRunnerLease()) {
+        result.cancelled = true;
+        saveManagedAds(managed);
+        break;
+      }
+
       try {
         const activation = await activateAd(adId, accountId);
         const latestAd = await verifyAdActivated(accountId, adId, dataDate, timeZone);
@@ -2600,14 +2786,18 @@
     return result;
   }
 
-  async function reopenScheduledSpendAdsForAccount(accountId, account, timing, executionId, source) {
-    const result = { checked: 0, matchedSpend: 0, reopened: 0, wouldReopen: 0, skipped: 0, failed: 0 };
+  async function reopenScheduledSpendAdsForAccount(accountId, account, timing, executionId, source, executionVersion = zeroReopenExecutionVersion) {
+    const result = { checked: 0, matchedSpend: 0, reopened: 0, wouldReopen: 0, skipped: 0, failed: 0, cancelled: false };
     const pausedAds = await fetchAllAds(accountId, 'PAUSED', timing.date, account.timeZone);
     result.checked = pausedAds.length;
     const spendRange = zeroReopenSpendRange();
     const spendText = `${spendRange.min.toFixed(2)}-${spendRange.max.toFixed(2)}`;
 
     for (const ad of pausedAds) {
+      if (!config.zeroReopen.enabled || executionVersion !== zeroReopenExecutionVersion || !ownsRunnerLease()) {
+        result.cancelled = true;
+        break;
+      }
       const adId = String(ad.ad_id || '');
       if (!adId) {
         result.skipped += 1;
@@ -2659,6 +2849,11 @@
         continue;
       }
 
+      if (!config.zeroReopen.enabled || executionVersion !== zeroReopenExecutionVersion || !ownsRunnerLease()) {
+        result.cancelled = true;
+        break;
+      }
+
       try {
         const activation = await activateAd(adId, accountId);
         const latestAd = await verifyAdActivated(accountId, adId, timing.date, account.timeZone);
@@ -2695,13 +2890,13 @@
 
   function scheduleNextZeroReopen(delayMs = 60000) {
     clearScheduledZeroReopen();
-    if (!running || !config.zeroReopen.enabled) return;
+    if (!running || !config.zeroReopen.enabled || !ownsRunnerLease()) return;
     zeroReopenTimerId = window.setTimeout(runZeroReopenChecks, Math.max(1000, delayMs));
   }
 
   async function runZeroReopenChecks() {
     zeroReopenTimerId = null;
-    if (!running || !config.zeroReopen.enabled) return;
+    if (!running || !config.zeroReopen.enabled || !ownsRunnerLease()) return;
     if (zeroReopenExecuting) {
       scheduleNextZeroReopen();
       return;
@@ -2712,6 +2907,7 @@
     }
 
     zeroReopenExecuting = true;
+    const executionVersion = zeroReopenExecutionVersion;
     const executionId = `${Date.now()}-zero-reopen-${Math.random().toString(36).slice(2, 8)}`;
     const state = getZeroReopenState();
     let ranAccounts = 0;
@@ -2720,7 +2916,7 @@
 
     try {
       for (const accountId of config.accountIds) {
-        if (loginExpired) break;
+        if (loginExpired || !config.zeroReopen.enabled || executionVersion !== zeroReopenExecutionVersion || !ownsRunnerLease()) break;
         const account = selectedAccountCandidate(accountId);
         const timeZone = normalizeTimeZone(account?.timeZone);
         if (!timeZone) continue;
@@ -2736,10 +2932,10 @@
         setStatus(`定时自动开广告：正在处理账户 ${accountId}（${timeZone} ${scheduleText}）…`, 'working');
 
         try {
-          const result = await reopenScheduledSpendAdsForAccount(accountId, { ...account, timeZone }, timing, executionId, 'zero_reopen_timer');
+          const result = await reopenScheduledSpendAdsForAccount(accountId, { ...account, timeZone }, timing, executionId, 'zero_reopen_timer', executionVersion);
           reopened += result.reopened;
           failed += result.failed;
-          if (result.failed === 0) {
+          if (!result.cancelled && result.failed === 0) {
             state[runKey] = {
               done: true,
               done_at: Date.now(),
@@ -2764,10 +2960,10 @@
             mode: config.mode,
             account_id: String(accountId),
             action: 'SCHEDULED_REOPEN_ACCOUNT_SUMMARY',
-            success: result.failed === 0,
+            success: result.failed === 0 && !result.cancelled,
             data_date: timing.date,
             time_zone: timeZone,
-            message: `定时自动开广告：暂停${result.checked}条，花费区间内${result.matchedSpend}条，恢复${result.reopened}条，观察${result.wouldReopen}条，跳过${result.skipped}条，失败${result.failed}条`,
+            message: `定时自动开广告：暂停${result.checked}条，花费区间内${result.matchedSpend}条，开启${result.reopened}条，观察${result.wouldReopen}条，跳过${result.skipped}条，失败${result.failed}条${result.cancelled ? '，任务已即时停止' : ''}`,
           });
         } catch (error) {
           failed += 1;
@@ -2782,23 +2978,33 @@
             time_zone: timeZone,
             message: `定时自动开广告失败：${error.message}`,
           });
-          if (loginExpired) break;
+          if (loginExpired || !ownsRunnerLease()) break;
         }
       }
 
-      if (ranAccounts) {
-        setStatus(`定时自动开广告完成：处理账户${ranAccounts}个，恢复${reopened}条，失败${failed}条`, failed ? 'error' : 'ok');
+      const cancelled = !config.zeroReopen.enabled
+        || executionVersion !== zeroReopenExecutionVersion
+        || !ownsRunnerLease();
+      if (!cancelled && ranAccounts) {
+        setStatus(`定时自动开广告完成：处理账户${ranAccounts}个，开启${reopened}条，失败${failed}条`, failed ? 'error' : 'ok');
         renderSummaries();
         renderLogs();
       }
     } finally {
       zeroReopenExecuting = false;
       scheduleNextZeroReopen();
+      if (!running && !executing) releaseRunnerLease();
     }
   }
 
   async function executeRound(source = 'auto') {
     if (executing) return;
+    if (!ownsRunnerLease() && !acquireRunnerLease()) {
+      setStatus('其他页面正在执行任务，本页面未运行', 'idle');
+      updateButtons();
+      return;
+    }
+    startRunnerHeartbeat();
     executing = true;
     clearScheduledRun();
     setStatus('正在读取广告数据…', 'working');
@@ -2816,6 +3022,7 @@
       validateConfig();
       for (const accountId of config.accountIds) {
         if (loginExpired) break;
+        if (!ownsRunnerLease()) throw new Error('任务执行权已转移到其他页面');
         const account = config.accountCandidates.find((item) => item.id === accountId) || { id: accountId, timeZone: '' };
         const dataContext = mainDataContext(account);
         const dataDate = dataContext.date;
@@ -2832,6 +3039,7 @@
           let accountPaused = 0;
 
           for (const ad of ads) {
+            if (!ownsRunnerLease()) throw new Error('任务执行权已转移到其他页面');
             checked += 1;
             accountChecked += 1;
             const adId = String(ad.ad_id || '');
@@ -2869,6 +3077,7 @@
             }
 
             try {
+              if (!ownsRunnerLease()) throw new Error('任务执行权已转移到其他页面');
               const result = await pauseAd(ad, accountId);
               paused += 1;
               accountPaused += 1;
@@ -2897,7 +3106,7 @@
             action: 'ACCOUNT_SUMMARY',
             success: reviewResult.failed === 0,
             metrics: accountMetrics,
-            message: `当日全部广告${allAds.length}条，活动${ads.length}条，关闭${pausedAds.length}条，检查${accountChecked}条，命中${accountMatched}条，暂停${accountPaused}条，复核${reviewResult.reviewed}条，恢复${reviewResult.reopened}条，保持暂停${reviewResult.kept}条，跳过复核${reviewResult.skipped}条，失败${reviewResult.failed}条`,
+            message: `当日全部广告${allAds.length}条，活动${ads.length}条，关闭${pausedAds.length}条，检查${accountChecked}条，命中${accountMatched}条，暂停${accountPaused}条，复核${reviewResult.reviewed}条，复核开启${reviewResult.reopened}条，保持暂停${reviewResult.kept}条，跳过复核${reviewResult.skipped}条，失败${reviewResult.failed}条`,
           });
           queueFeishuAccountSync(allAds, accountId, executionId, dataDate, dataTimeZone);
         } catch (error) {
@@ -2913,7 +3122,7 @@
             success: false,
             message: error.message,
           });
-          if (loginExpired) break;
+          if (loginExpired || !ownsRunnerLease()) break;
         }
       }
 
@@ -2923,9 +3132,9 @@
         mode: config.mode,
         action: 'ROUND_SUMMARY',
         success: failed === 0,
-        message: `账户${accountsCompleted}/${config.accountIds.length}，检查${checked}条，命中${matched}条，暂停${paused}条，复核${reviewed}条，恢复${reopened}条，保持暂停${keptPaused}条，失败${failed}条`,
+        message: `账户${accountsCompleted}/${config.accountIds.length}，检查${checked}条，命中${matched}条，暂停${paused}条，复核${reviewed}条，复核开启${reopened}条，保持暂停${keptPaused}条，失败${failed}条`,
       });
-      setStatus(`完成：账户${accountsCompleted}/${config.accountIds.length}，检查${checked}，暂停${paused}，复核${reviewed}，恢复${reopened}，失败${failed}`, failed ? 'error' : 'ok');
+      setStatus(`完成：账户${accountsCompleted}/${config.accountIds.length}，检查${checked}，暂停${paused}，复核${reviewed}，复核开启${reopened}，失败${failed}`, failed ? 'error' : 'ok');
     } catch (error) {
       failed += 1;
       addLog({
@@ -2940,7 +3149,8 @@
     } finally {
       executing = false;
       scheduleNextZeroReopen();
-      if (running) scheduleNextRun();
+      if (running && ownsRunnerLease()) scheduleNextRun();
+      if (!running) releaseRunnerLease();
       updateButtons();
     }
   }
@@ -2988,10 +3198,13 @@
       }
     }
     const stageRules = stageRuleEntries(config.policy.stages);
-    if (!stageRules.length) throw new Error('至少保留一个检测点');
+    if (!spendCheckpoints(config.policy.stages).length || !stageRules.length) {
+      throw new Error('至少需要一个花费大于0的有效检测点');
+    }
     for (const { spend, stage, index } of stageRules) {
       const rowLabel = `$${spend}阶段第${index + 1}行`;
       if (!Number.isFinite(Number(spend)) || Number(spend) <= 0) throw new Error('检测点花费必须是大于0的数字');
+      if (!stageRuleHasEnabledMetric(stage)) throw new Error(`${rowLabel}至少需要一个大于0的指标`);
       if (!Number.isInteger(Number(stage.minFbClicks))) {
         throw new Error(`${rowLabel}FB最少单次链接点击必须是整数`);
       }
@@ -3069,6 +3282,7 @@
 
   function scheduleNextRun() {
     clearScheduledRun();
+    if (!running || !ownsRunnerLease()) return;
     const intervalMs = numberValue(config.intervalMinutes) * 60 * 1000;
     nextRunAt = Date.now() + intervalMs;
     timerId = window.setTimeout(() => executeRound('auto'), intervalMs);
@@ -3083,17 +3297,24 @@
 
   function start() {
     if (running) return;
+    if (!acquireRunnerLease()) {
+      setStatus('其他页面正在执行任务，本页面不能重复启动', 'idle');
+      updateButtons();
+      return;
+    }
     try {
       readFormConfig();
       validateConfig();
       saveConfig();
     } catch (error) {
+      releaseRunnerLease();
       setStatus(error.message, 'error');
       return;
     }
     running = true;
     loginExpired = false;
     setRunIntent(true);
+    startRunnerHeartbeat();
     updateButtons();
     scheduleLoginGuard(1000);
     scheduleNextZeroReopen(1000);
@@ -3103,10 +3324,13 @@
   function stop() {
     running = false;
     loginExpired = false;
+    reviewExecutionVersion += 1;
+    zeroReopenExecutionVersion += 1;
     setRunIntent(false);
     localStorage.removeItem(LOGIN_RESUME_KEY);
     clearScheduledRun();
     clearScheduledZeroReopen();
+    if (!executing && !zeroReopenExecuting) releaseRunnerLease();
     updateButtons();
     setStatus(executing ? '已停止后续循环；本轮仍在执行' : '已停止', 'idle');
   }
@@ -3152,8 +3376,11 @@
     }
     running = false;
     loginExpired = true;
+    reviewExecutionVersion += 1;
+    zeroReopenExecutionVersion += 1;
     clearScheduledRun();
     clearScheduledZeroReopen();
+    if (!executing && !zeroReopenExecuting) releaseRunnerLease();
     updateButtons();
     setStatus(`店铺登录已过期，已暂停广告操作：${message}`, 'error');
     setLoginStatus(`登录已过期：${message}`, 'error');
@@ -3452,9 +3679,10 @@
     }));
     const stageRows = [...document.querySelectorAll('#xh-stage-list .stage-policy-row')];
     if (!stageRows.length) throw new Error('至少保留一个检测点');
-    const stageEntries = stageRows.map((row) => {
+    const stageEntries = stageRows.map((row, index) => {
       const spend = fieldNumber('.stage-spend', row);
-      return [String(spend), {
+      if (!Number.isFinite(spend) || spend <= 0) throw new Error(`第${index + 1}行检测点花费必须是大于0的数字`);
+      const stage = {
         minFbClicks: fieldNumber('.stage-fb-clicks', row),
         minFbAddToCart: fieldNumber('.stage-fb-cart', row),
         minFbPurchases: fieldNumber('.stage-fb-purchases', row),
@@ -3463,7 +3691,11 @@
         minAddToCart: fieldNumber('.stage-cart', row),
         minInitiateCheckout: fieldNumber('.stage-checkout', row),
         minOrders: fieldNumber('.stage-orders', row),
-      }];
+      };
+      if (!stageRuleHasEnabledMetric(stage)) {
+        throw new Error(`$${spend}检查点第${index + 1}行至少需要填写一个大于0的指标`);
+      }
+      return [String(spend), stage];
     });
     const stageGroups = {};
     for (const [spend, stage] of stageEntries) {
@@ -3530,10 +3762,18 @@
     const stopButton = document.querySelector('#xh-stop');
     const runButton = document.querySelector('#xh-run-once');
     if (!startButton) return;
-    startButton.disabled = running || executing;
+    const otherPageRunning = runnerPageLabel() === '其他页面';
+    startButton.disabled = running || executing || otherPageRunning;
     stopButton.disabled = !running;
-    runButton.disabled = executing;
+    runButton.disabled = executing || otherPageRunning;
     renderOverview();
+  }
+
+  function refreshRunnerStatusUi() {
+    const label = runnerPageLabel();
+    if (label === lastRunnerPageLabel) return;
+    lastRunnerPageLabel = label;
+    updateButtons();
   }
 
   function setStatus(text, kind) {
@@ -3606,7 +3846,7 @@
 
   function renderActionBadge(action) {
     const value = String(action || '-');
-    return `<span class="badge ${actionBadgeClass(value)}">${html(value)}</span>`;
+    return `<span class="badge ${actionBadgeClass(value)}" title="${html(value)}">${html(operationName(value))}</span>`;
   }
 
   function renderResultBadge(success, text = '') {
@@ -3632,7 +3872,9 @@
       { label: '已选择账户', value: selected, hint: accountTotal ? `共 ${accountTotal} 个检测账户` : '尚未检测账户' },
       { label: '本轮检查', value: checkedCount, hint: accountDoneText },
       { label: '自动暂停', value: actionCount(['PAUSE']), hint: '正式模式命中后暂停' },
-      { label: '自动恢复', value: actionCount(['REOPEN', 'REOPEN_ZERO_SPEND', 'REOPEN_SCHEDULED_SPEND']), hint: '复核或定时恢复' },
+      { label: '复核开启', value: config.review.enabled ? '已启用' : '已关闭', hint: `已通过复核开启 ${actionCount(['REOPEN'])} 条` },
+      { label: '定时开启', value: config.zeroReopen.enabled ? '已启用' : '已关闭', hint: `已通过定时任务开启 ${actionCount(['REOPEN_ZERO_SPEND', 'REOPEN_SCHEDULED_SPEND'])} 条` },
+      { label: '执行页面', value: runnerPageLabel(), hint: runnerPageLabel() === '其他页面' ? '任务由另一个ShopCity标签页执行' : '同一店铺只允许一个页面执行' },
       { label: '失败', value: failed, hint: failed ? '存在失败日志' : '暂无失败', tone: failed ? 'danger' : '' },
       { label: '下次执行', value: document.querySelector('#xh-countdown')?.textContent || '未启动', hint: running ? '循环任务已启动' : '循环任务未启动', valueId: 'xh-overview-next-run' },
       { label: '运行模式', value: config.mode === 'live' ? '正式模式' : '观察模式', hint: config.mode === 'live' ? '命中后会执行暂停' : '只记录不暂停' },
@@ -3665,7 +3907,7 @@
     const actionFilter = document.querySelector('#xh-log-filter-action')?.value || '';
     const resultFilter = document.querySelector('#xh-log-filter-result')?.value || '';
     const logs = getLogs()
-      .filter((log) => !['ACCOUNT_SUMMARY', 'ROUND_SUMMARY', 'REVIEW_KEEP_PAUSED', 'ZERO_REOPEN_ACCOUNT_SUMMARY', 'SCHEDULED_REOPEN_ACCOUNT_SUMMARY'].includes(log.action))
+      .filter((log) => !['ACCOUNT_SUMMARY', 'ROUND_SUMMARY', 'ZERO_REOPEN_ACCOUNT_SUMMARY', 'SCHEDULED_REOPEN_ACCOUNT_SUMMARY'].includes(log.action))
       .filter((log) => {
         const accountId = String(log.account_id || '');
         const adId = String(log.ad_id || '');
@@ -3860,6 +4102,73 @@
     });
   }
 
+  function applyAutomationToggle(kind, enabled, panel) {
+    if (kind === 'review') {
+      config.review.enabled = enabled;
+      reviewExecutionVersion += 1;
+    } else if (kind === 'zeroReopen') {
+      config.zeroReopen.enabled = enabled;
+      zeroReopenExecutionVersion += 1;
+      clearScheduledZeroReopen();
+      if (enabled && running && ownsRunnerLease()) scheduleNextZeroReopen(1000);
+    } else {
+      return;
+    }
+    saveConfig();
+    syncToggleCards(panel);
+    updateAutomationToggleStatus(panel);
+    renderOverview();
+    const label = kind === 'review' ? '关闭广告复核' : '账户定时自动开广告';
+    setStatus(`${label}已${enabled ? '开启' : '关闭'}并立即生效`, 'ok');
+  }
+
+  function updateAutomationToggleStatus(panel = document) {
+    const states = [
+      ['#xh-review-enabled', '#xh-review-effective-status'],
+      ['#xh-zero-reopen-enabled', '#xh-zero-reopen-effective-status'],
+    ];
+    for (const [toggleSelector, statusSelector] of states) {
+      const enabled = Boolean(panel.querySelector(toggleSelector)?.checked);
+      const status = panel.querySelector(statusSelector);
+      if (!status) continue;
+      status.textContent = enabled ? '已开启并生效' : '已关闭并生效';
+      status.dataset.enabled = String(enabled);
+    }
+  }
+
+  function syncAutomationToggleInputs(panel = document) {
+    const reviewToggle = panel.querySelector('#xh-review-enabled');
+    const zeroReopenToggle = panel.querySelector('#xh-zero-reopen-enabled');
+    if (reviewToggle) reviewToggle.checked = config.review.enabled;
+    if (zeroReopenToggle) zeroReopenToggle.checked = config.zeroReopen.enabled;
+    syncToggleCards(panel);
+    updateAutomationToggleStatus(panel);
+  }
+
+  function handleCrossPageStorage(event) {
+    if (event.storageArea !== localStorage) return;
+    if (event.key === STORAGE_KEY && event.newValue) {
+      try {
+        const previousReviewEnabled = config.review.enabled;
+        const previousZeroReopenEnabled = config.zeroReopen.enabled;
+        config = normalizeConfig(JSON.parse(event.newValue));
+        if (previousReviewEnabled !== config.review.enabled) reviewExecutionVersion += 1;
+        if (previousZeroReopenEnabled !== config.zeroReopen.enabled) {
+          zeroReopenExecutionVersion += 1;
+          clearScheduledZeroReopen();
+          if (config.zeroReopen.enabled && running && ownsRunnerLease()) scheduleNextZeroReopen(1000);
+        }
+        syncAutomationToggleInputs(document.querySelector('#xh-fb-controller') || document);
+        renderOverview();
+      } catch (_) { /* ignore invalid cross-page configuration */ }
+      return;
+    }
+    if (event.key?.startsWith(RUNNER_LOCK_KEY_PREFIX)) {
+      if ((running || executing || zeroReopenExecuting) && !ownsRunnerLease()) handleRunnerLeaseLost();
+      else updateButtons();
+    }
+  }
+
   function createPanel() {
     const style = document.createElement('style');
     style.textContent = `
@@ -3913,6 +4222,8 @@
       #xh-fb-controller .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
       #xh-fb-controller .card-head .submodule-title{margin:0}
       #xh-fb-controller .card-desc,#xh-fb-controller .policy-note,#xh-fb-controller .account-select-rule{font-size:12px;color:var(--soft);line-height:1.6}
+      #xh-fb-controller .toggle-effective-status{margin-top:4px;font-size:12px;font-weight:600;color:var(--weak)}
+      #xh-fb-controller .toggle-effective-status[data-enabled="true"]{color:var(--success)}
 
       /* 7. Overview */
       #xh-fb-controller .overview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
@@ -4151,6 +4462,7 @@
             <div><strong>花费检查点怎么生效：</strong>广告累计花费达到某个检查点后，脚本才会检查该行条件。</div>
             <div><strong>只执行最高档：</strong>例如花费为 $1.80，存在 $0.35 和 $1.60 两档时，只执行 $1.60 这一行。</div>
             <div><strong>数字 0 的含义：</strong>填写 0 代表该项不参与检查；填写大于 0 才表示需要达到的最低数量。</div>
+            <div><strong>有效规则要求：</strong>至少保留一个花费大于 0 的检查点，并且每一行至少启用一个大于 0 的指标；全为 0 的空规则不能保存。</div>
             <div><strong>同花费多行：</strong>同一花费检查点可以配置多行；单行内多个启用指标是“并且”，同花费多行之间是“或者”。</div>
             <div><strong>判定规则：</strong>任一广告保护规则命中后会直接保留；未命中保护时，当前最高花费点任意一行全部达标就保留，所有同花费行都未达标才命中关闭规则；观察模式只记录，正式模式才暂停。</div>
           </div></details>
@@ -4189,16 +4501,16 @@
           </div>
           <div class="automation-grid">
             <div class="submodule toggle-card" data-toggle-source="xh-review-enabled">
-              <div class="card-head"><div><div class="submodule-title">关闭广告复核</div><div class="card-desc">每轮主任务检查全部关闭广告，达标后恢复。</div></div><label class="toggle-switch"><input type="checkbox" id="xh-review-enabled" ${config.review.enabled ? 'checked' : ''}><span></span></label></div>
+              <div class="card-head"><div><div class="submodule-title">关闭广告复核</div><div class="card-desc">每轮主任务检查全部关闭广告；达到首个花费检查点并通过规则后开启。</div><div class="toggle-effective-status" id="xh-review-effective-status" data-enabled="${config.review.enabled}">${config.review.enabled ? '已开启并生效' : '已关闭并生效'}</div></div><label class="toggle-switch"><input type="checkbox" id="xh-review-enabled" ${config.review.enabled ? 'checked' : ''}><span></span></label></div>
               <div class="toggle-content">
                 <div class="automation-fields compact-fields">
                   <div class="form-field"><label>最大复核次数</label><div class="input-with-unit"><input type="number" min="1" step="1" id="xh-review-max" value="${html(config.review.maxReviews)}"><span>次 / 广告 / 天</span></div></div>
                 </div>
-                <details class="rule-details"><summary>ⓘ 关闭广告复核说明</summary><div>每轮任务都会用同一套广告保护和花费检查点规则检测关闭状态广告；不命中关闭规则时，正式模式会自动开启，观察模式只记录；仍命中关闭规则时保持关闭并累计当天复核次数，达到上限后当天跳过。</div></details>
+                <details class="rule-details"><summary>ⓘ 关闭广告复核说明</summary><div>每轮任务都会检测全部关闭状态广告，包括人工关闭广告。广告花费未达到首个有效检查点时保持关闭，不消耗复核次数，并且同一广告、日期和首检查点只记录一次数据不足日志；达到后再按广告保护和最高花费检查点规则判断，不命中关闭规则时正式模式会自动开启、观察模式只记录。仍命中关闭规则时保持关闭并累计当天复核次数，达到上限后当天跳过；广告策略变化后会自动获得新的复核资格。</div></details>
               </div>
             </div>
             <div class="submodule toggle-card" data-toggle-source="xh-zero-reopen-enabled">
-              <div class="card-head"><div><div class="submodule-title">账户定时自动开广告</div><div class="card-desc">按广告账户时区，在指定时间打开符合花费区间的暂停广告。</div></div><label class="toggle-switch"><input type="checkbox" id="xh-zero-reopen-enabled" ${config.zeroReopen.enabled ? 'checked' : ''}><span></span></label></div>
+              <div class="card-head"><div><div class="submodule-title">账户定时自动开广告</div><div class="card-desc">按广告账户时区，在指定时间打开符合花费区间的暂停广告。</div><div class="toggle-effective-status" id="xh-zero-reopen-effective-status" data-enabled="${config.zeroReopen.enabled}">${config.zeroReopen.enabled ? '已开启并生效' : '已关闭并生效'}</div></div><label class="toggle-switch"><input type="checkbox" id="xh-zero-reopen-enabled" ${config.zeroReopen.enabled ? 'checked' : ''}><span></span></label></div>
               <div class="toggle-content">
                 <div class="automation-fields two-up-fields">
                   <div class="form-field"><label>执行时间</label><div class="time-inputs"><input type="number" min="0" max="23" step="1" id="xh-zero-reopen-hour" value="${html(config.zeroReopen.hour)}"><span>:</span><input type="number" min="0" max="59" step="1" id="xh-zero-reopen-minute" value="${html(config.zeroReopen.minute)}"></div></div>
@@ -4244,7 +4556,7 @@
             <div class="log-filters">
               <div><label>广告账户 ID</label><input id="xh-log-filter-account" placeholder="输入广告账户ID"></div>
               <div><label>广告 ID</label><input id="xh-log-filter-ad" placeholder="输入广告ID"></div>
-              <div><label>动作类型</label><select id="xh-log-filter-action"><option value="">全部动作</option><option value="PAUSE">PAUSE</option><option value="REOPEN">REOPEN</option><option value="WHITELIST_SKIP">WHITELIST_SKIP</option><option value="REVIEW_WHITELIST_SKIP">REVIEW_WHITELIST_SKIP</option><option value="SCHEDULED_REOPEN_WHITELIST_SKIP">SCHEDULED_REOPEN_WHITELIST_SKIP</option><option value="ACCOUNT_ERROR">ACCOUNT_ERROR</option><option value="ROUND_ERROR">ROUND_ERROR</option></select></div>
+              <div><label>动作类型</label><select id="xh-log-filter-action"><option value="">全部动作</option><option value="PAUSE">自动暂停</option><option value="WOULD_REOPEN">准备复核开启</option><option value="REOPEN">复核已开启</option><option value="REVIEW_KEEP_PAUSED">复核保持暂停</option><option value="WOULD_REOPEN_SCHEDULED_SPEND">准备定时开启</option><option value="REOPEN_SCHEDULED_SPEND">定时已开启</option><option value="WHITELIST_SKIP">白名单跳过</option><option value="REVIEW_WHITELIST_SKIP">复核白名单跳过</option><option value="SCHEDULED_REOPEN_WHITELIST_SKIP">定时白名单跳过</option><option value="ACCOUNT_ERROR">账户异常</option><option value="ROUND_ERROR">任务异常</option></select></div>
               <div><label>结果状态</label><select id="xh-log-filter-result"><option value="">全部结果</option><option value="success">成功</option><option value="failure">失败</option></select></div>
             </div>
             <div class="logs"><table class="data-table"><thead><tr><th>时间</th><th class="id-cell">广告账户ID</th><th class="id-cell">广告ID</th><th>广告名称</th><th class="metric-cell">花费</th><th class="metric-cell">FB单点</th><th class="metric-cell">CPC</th><th class="metric-cell">FB加购</th><th class="metric-cell">访客</th><th class="metric-cell">商详访客</th><th class="metric-cell">FB成效</th><th class="metric-cell">站内加购</th><th class="metric-cell">发起结账</th><th class="metric-cell">订单</th><th>动作</th><th>规则</th><th>结果</th></tr></thead><tbody id="xh-log-body"></tbody></table></div>
@@ -4378,12 +4690,18 @@
     panel.querySelector('#xh-start').addEventListener('click', start);
     panel.querySelector('#xh-stop').addEventListener('click', stop);
     panel.querySelector('#xh-run-once').addEventListener('click', () => {
+      if (!acquireRunnerLease()) {
+        setStatus('其他页面正在执行任务，本页面不能手动执行', 'idle');
+        updateButtons();
+        return;
+      }
       try {
         readFormConfig();
         validateConfig();
         saveConfig();
         executeRound('manual');
       } catch (error) {
+        releaseRunnerLease();
         setStatus(error.message, 'error');
       }
     });
@@ -4454,21 +4772,30 @@
     panel.querySelector('#xh-log-filter-result').addEventListener('change', renderLogs);
     panel.querySelector('#xh-export').addEventListener('click', exportCsv);
     panel.querySelector('#xh-clear-logs').addEventListener('click', clearLogs);
-    ['#xh-review-enabled', '#xh-zero-reopen-enabled', '#xh-login-guard-enabled'].forEach((selector) => {
-      panel.querySelector(selector)?.addEventListener('change', () => syncToggleCards(panel));
+    panel.querySelector('#xh-review-enabled')?.addEventListener('change', (event) => {
+      applyAutomationToggle('review', event.target.checked, panel);
     });
+    panel.querySelector('#xh-zero-reopen-enabled')?.addEventListener('change', (event) => {
+      applyAutomationToggle('zeroReopen', event.target.checked, panel);
+    });
+    panel.querySelector('#xh-login-guard-enabled')?.addEventListener('change', () => syncToggleCards(panel));
     panel.querySelector('#xh-collapse').addEventListener('click', () => {
       panel.classList.toggle('collapsed');
       panel.querySelector('#xh-collapse').textContent = panel.classList.contains('collapsed') ? '+' : '−';
       requestAnimationFrame(() => clampPanelPosition(panel, true));
     });
 
-    countdownId = window.setInterval(updateCountdown, 1000);
+    countdownId = window.setInterval(() => {
+      updateCountdown();
+      refreshRunnerStatusUi();
+    }, 1000);
+    window.addEventListener('storage', handleCrossPageStorage);
     window.addEventListener('beforeunload', () => {
       if (countdownId) window.clearInterval(countdownId);
       if (timerId) window.clearTimeout(timerId);
       if (zeroReopenTimerId) window.clearTimeout(zeroReopenTimerId);
       if (loginGuardTimerId) window.clearTimeout(loginGuardTimerId);
+      releaseRunnerLease();
     });
     renderSummaries();
     renderLogs();
@@ -4476,6 +4803,7 @@
     initModuleTabs(panel);
     initLogTabs(panel);
     syncToggleCards(panel);
+    updateAutomationToggleStatus(panel);
     renderOverview();
     applyAdAccountFilter();
     scheduleLoginGuard(1200);
