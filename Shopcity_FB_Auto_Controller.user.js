@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shopcity Facebook 广告自动控制器
 // @namespace    xh-shopcity
-// @version      1.8.32
-// @description  强化复核门槛、即时开关与单页面执行保护。
+// @version      1.8.33
+// @description  支持CPM上限检查、复核门槛与单页面执行保护。
 // @match        https://*.shopcity.vip/admin*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -27,7 +27,7 @@
   const FEISHU_SECRET_KEY = 'xh_shopcity_fb_controller_feishu_secret_v1';
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-  const CURRENT_VERSION = '1.8.32';
+  const CURRENT_VERSION = '1.8.33';
   const SHOP_ID_CHECK_URL = 'https://api.shopcity.vip/sail/seller/check-user';
   const LOGIN_PASSWORD_KEY_PREFIX = 'xh_shopcity_fb_controller_login_password_v1_';
   const LOGIN_RETURN_URL_KEY = 'xh_shopcity_fb_controller_login_return_url_v1';
@@ -48,7 +48,7 @@
   const INSTANCE_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const STAGE_METRIC_KEYS = [
     'minFbClicks', 'minFbAddToCart', 'minFbPurchases', 'minVisitors',
-    'minViewContent', 'minAddToCart', 'minInitiateCheckout', 'minOrders',
+    'minViewContent', 'minAddToCart', 'minInitiateCheckout', 'minOrders', 'maxCpm',
   ];
   const PROTECTION_METRICS = [
     { id: 'fb_purchase_num', label: 'FB成效', keys: ['fb_purchase_num'] },
@@ -115,10 +115,10 @@
         { metric: 'fb_add_to_cart', minCount: 1, maxSpend: 3 },
       ],
       stages: {
-        1: { minFbClicks: 1, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
-        2: { minFbClicks: 2, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
-        3: { minFbClicks: 3, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
-        5: { minFbClicks: 4, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0 },
+        1: { minFbClicks: 1, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0, maxCpm: 0 },
+        2: { minFbClicks: 2, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0, maxCpm: 0 },
+        3: { minFbClicks: 3, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0, maxCpm: 0 },
+        5: { minFbClicks: 4, minFbAddToCart: 0, minFbPurchases: 0, minVisitors: 0, minViewContent: 0, minAddToCart: 0, minInitiateCheckout: 0, minOrders: 0, maxCpm: 0 },
       },
     },
   };
@@ -326,6 +326,7 @@
       minAddToCart: numberValue(stage?.minFbAddToCart == null ? 0 : stage?.minAddToCart),
       minInitiateCheckout: numberValue(stage?.minInitiateCheckout),
       minOrders: numberValue(stage?.minOrders),
+      maxCpm: numberValue(stage?.maxCpm),
     };
   }
 
@@ -2135,6 +2136,27 @@
     return numberValue(firstValue(object, keys, 0));
   }
 
+  function cpmMetric(ad) {
+    const spend = numberFrom(ad, ['spend_usd', 'spend', 'amount_spent']);
+    const rawCpm = firstValue(ad, ['cpm_usd', 'cpm'], null);
+    const directCpm = Number(rawCpm);
+    // Positive spend with zero CPM is incomplete data, so prefer an impressions-based fallback.
+    if (rawCpm !== null && Number.isFinite(directCpm) && directCpm >= 0 && (directCpm > 0 || spend <= 0)) {
+      return { available: true, value: directCpm, source: 'api' };
+    }
+
+    const rawImpressions = firstValue(ad, ['impressions', 'impression'], null);
+    const impressions = Number(rawImpressions);
+    if (rawImpressions !== null && Number.isFinite(impressions) && impressions > 0) {
+      return {
+        available: true,
+        value: spend / impressions * 1000,
+        source: 'calculated',
+      };
+    }
+    return { available: false, value: 0, source: 'missing' };
+  }
+
   function percentageFrom(object, keys) {
     const raw = firstValue(object, keys, 0);
     const value = numberValue(String(raw).replace('%', ''));
@@ -2456,6 +2478,7 @@
     const addToCart = numberValue(ad.add_to_cart_uv_num);
     const initiateCheckout = numberValue(ad.initiate_checkout_uv_num);
     const orders = numberValue(ad.total_order_num);
+    const cpm = cpmMetric(ad);
     const policy = config.policy;
 
     const protectedRule = policy.protectionRules.find((rule) => (
@@ -2467,6 +2490,7 @@
     const reachedStage = highestReachedSpendCheckpoint(policy.stages, spend);
     if (reachedStage) {
       const failures = [];
+      const deferred = [];
       const rules = stageRulesForSpend(policy.stages, reachedStage);
       for (const [index, stage] of rules.entries()) {
         const checks = [
@@ -2480,12 +2504,37 @@
           { id: 'ORDERS', label: 'Shopcity订单', value: orders, target: numberValue(stage.minOrders) },
         ].filter((check) => check.target > 0);
         const failed = checks.find((check) => check.value < check.target);
-        if (!failed) return null;
-        failures.push({
-          id: `STAGE_${reachedStage}_${failed.id}`,
-          detail: `第${index + 1}行 ${failed.label} ${failed.value} < 目标 ${failed.target}`,
-          reason: `广告达到$${reachedStage}阶段，${failed.label} ${failed.value} < 目标 ${failed.target}`,
-        });
+        if (failed) {
+          failures.push({
+            id: `STAGE_${reachedStage}_${failed.id}`,
+            detail: `第${index + 1}行 ${failed.label} ${failed.value} < 目标 ${failed.target}`,
+            reason: `广告达到$${reachedStage}阶段，${failed.label} ${failed.value} < 目标 ${failed.target}`,
+          });
+          continue;
+        }
+
+        const maxCpm = numberValue(stage.maxCpm);
+        if (maxCpm > 0 && !cpm.available) {
+          deferred.push(`第${index + 1}行 CPM数据暂不可用，无法判断上限 $${maxCpm.toFixed(2)}`);
+          continue;
+        }
+        if (maxCpm > 0 && cpm.value > maxCpm) {
+          failures.push({
+            id: `STAGE_${reachedStage}_CPM`,
+            detail: `第${index + 1}行 CPM $${cpm.value.toFixed(2)} > 上限 $${maxCpm.toFixed(2)}`,
+            reason: `广告达到$${reachedStage}阶段，CPM $${cpm.value.toFixed(2)} > 上限 $${maxCpm.toFixed(2)}`,
+          });
+          continue;
+        }
+        return null;
+      }
+      if (deferred.length) {
+        return {
+          id: `STAGE_${reachedStage}_CPM_DATA_PENDING`,
+          category: 'insufficient_data',
+          reason: `广告达到$${reachedStage}阶段，${deferred.join('；')}`,
+          deferred: true,
+        };
       }
       if (failures.length === 1) {
         return {
@@ -2506,6 +2555,7 @@
   }
 
   function metricsOf(ad) {
+    const cpm = cpmMetric(ad);
     return {
       fb_cpa: numberValue(ad.fb_cpa),
       fb_purchase_num: numberValue(ad.fb_purchase_num),
@@ -2516,6 +2566,8 @@
       initiate_checkout_uv_num: numberValue(ad.initiate_checkout_uv_num),
       total_order_num: numberValue(ad.total_order_num),
       spend_usd: numberValue(ad.spend_usd),
+      impressions: numberFrom(ad, ['impressions', 'impression']),
+      cpm: cpm.available ? cpm.value : 0,
       unique_link_click: numberValue(ad.unique_link_click),
       cost_per_unique_link_click_usd: numberValue(ad.cost_per_unique_link_click_usd),
     };
@@ -2601,6 +2653,7 @@
       review_done: false,
       review_policy_version: reviewPolicyFingerprint(),
       below_checkpoint_log_key: '',
+      insufficient_metric_log_key: '',
       close_rule: rule.id,
     };
     saveManagedAds(managed);
@@ -2625,6 +2678,7 @@
       review_done: false,
       review_policy_version: policyVersion,
       below_checkpoint_log_key: sameDate ? String(previous.below_checkpoint_log_key || '') : '',
+      insufficient_metric_log_key: sameReviewContext ? String(previous.insufficient_metric_log_key || '') : '',
       ...updates,
     };
     return managed[key];
@@ -2713,8 +2767,32 @@
       }
 
       current.below_checkpoint_log_key = '';
-      current.review_count = numberValue(current.review_count) + 1;
       const latestRule = matchRule(ad);
+
+      if (latestRule?.deferred) {
+        current.review_rule = latestRule.id;
+        current.review_done = false;
+        current.state = 'review_insufficient_metric_data';
+        result.kept += 1;
+        const insufficientMetricLogKey = `${dataDate}|${current.review_policy_version}|${latestRule.id}`;
+        if (current.insufficient_metric_log_key !== insufficientMetricLogKey) {
+          current.insufficient_metric_log_key = insufficientMetricLogKey;
+          addLog({
+            ...baseLog,
+            action: 'REVIEW_KEEP_PAUSED',
+            matched_rule: latestRule.id,
+            category: latestRule.category,
+            reason: latestRule.reason,
+            success: true,
+            message: '复核所需的CPM数据暂不可用，保持关闭且不消耗复核次数；后续主任务会继续判断',
+          });
+        }
+        saveManagedAds(managed);
+        continue;
+      }
+
+      current.insufficient_metric_log_key = '';
+      current.review_count = numberValue(current.review_count) + 1;
 
       if (latestRule) {
         current.review_rule = latestRule.id;
@@ -3044,7 +3122,7 @@
             accountChecked += 1;
             const adId = String(ad.ad_id || '');
             const rule = matchRule(ad);
-            if (!rule) continue;
+            if (!rule || rule.deferred) continue;
             matched += 1;
             accountMatched += 1;
 
@@ -3190,6 +3268,7 @@
         [`$${spend}阶段第${index + 1}行最少加购`, stage.minAddToCart],
         [`$${spend}阶段第${index + 1}行最少发起结账`, stage.minInitiateCheckout],
         [`$${spend}阶段第${index + 1}行最少订单`, stage.minOrders],
+        [`$${spend}阶段第${index + 1}行CPM上限`, stage.maxCpm],
       ]),
     ];
     for (const [name, value] of numericFields) {
@@ -3691,6 +3770,7 @@
         minAddToCart: fieldNumber('.stage-cart', row),
         minInitiateCheckout: fieldNumber('.stage-checkout', row),
         minOrders: fieldNumber('.stage-orders', row),
+        maxCpm: fieldNumber('.stage-cpm', row),
       };
       if (!stageRuleHasEnabledMetric(stage)) {
         throw new Error(`$${spend}检查点第${index + 1}行至少需要填写一个大于0的指标`);
@@ -4292,7 +4372,7 @@
       #xh-fb-controller .protection-head,#xh-fb-controller .protection-row{display:grid;grid-template-columns:minmax(260px,1fr) 150px 150px 72px;gap:8px;align-items:center}
       #xh-fb-controller .stage-head,#xh-fb-controller .stage-row{display:grid;grid-template-columns:88px minmax(0,1fr) 80px;gap:8px;align-items:center}
       #xh-fb-controller .stage-head.stage-four,#xh-fb-controller .stage-row.stage-four{grid-template-columns:88px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}
-      #xh-fb-controller .stage-head.stage-ten,#xh-fb-controller .stage-row.stage-ten{display:grid;grid-template-columns:96px 118px 108px 108px 96px 118px 108px 118px 96px 74px;column-gap:8px;row-gap:0;align-items:center;min-width:1120px;padding:0 8px}
+      #xh-fb-controller .stage-head.stage-ten,#xh-fb-controller .stage-row.stage-ten{display:grid;grid-template-columns:96px 118px 108px 108px 96px 118px 108px 118px 96px 100px 74px;column-gap:8px;row-gap:0;align-items:center;min-width:1228px;padding:0 8px}
       #xh-fb-controller .stage-head.zero-reopen-row,#xh-fb-controller .stage-row.zero-reopen-row{grid-template-columns:120px minmax(0,1fr) 80px}
       #xh-fb-controller .stage-head,#xh-fb-controller .protection-head{position:sticky;top:0;z-index:2;color:var(--muted);font-size:12px;font-weight:600;text-align:left;background:var(--subtle)}
       #xh-fb-controller .stage-head.stage-ten span{display:flex;align-items:center;height:42px;padding:0 6px;border-bottom:1px solid var(--border);background:#F8FAFC;white-space:normal;line-height:1.3}
@@ -4461,13 +4541,14 @@
           <details class="rule-details"><summary>ⓘ 花费检查点说明</summary><div class="checkpoint-help">
             <div><strong>花费检查点怎么生效：</strong>广告累计花费达到某个检查点后，脚本才会检查该行条件。</div>
             <div><strong>只执行最高档：</strong>例如花费为 $1.80，存在 $0.35 和 $1.60 两档时，只执行 $1.60 这一行。</div>
-            <div><strong>数字 0 的含义：</strong>填写 0 代表该项不参与检查；填写大于 0 才表示需要达到的最低数量。</div>
+            <div><strong>数字 0 的含义：</strong>填写 0 代表该项不参与检查；数量指标填写大于 0 表示需要达到的最低数量，CPM填写大于 0 表示不能超过的上限。</div>
+            <div><strong>CPM数据来源：</strong>优先读取接口返回的CPM，缺失时按花费 ÷ 展示次数 × 1000计算；仍无法取得时不误关活动广告，关闭广告保持暂停且不消耗复核次数。</div>
             <div><strong>有效规则要求：</strong>至少保留一个花费大于 0 的检查点，并且每一行至少启用一个大于 0 的指标；全为 0 的空规则不能保存。</div>
             <div><strong>同花费多行：</strong>同一花费检查点可以配置多行；单行内多个启用指标是“并且”，同花费多行之间是“或者”。</div>
             <div><strong>判定规则：</strong>任一广告保护规则命中后会直接保留；未命中保护时，当前最高花费点任意一行全部达标就保留，所有同花费行都未达标才命中关闭规则；观察模式只记录，正式模式才暂停。</div>
           </div></details>
           <div class="stage-table">
-            <div class="stage-head stage-ten"><span>花费检查点</span><span>FB最少单次链接点击数</span><span>FB最少加购数</span><span>FB最少成效数</span><span>最少访客数</span><span>最少商详页访客数</span><span>最少加购数</span><span>最少发起结账数</span><span>最少订单数</span><span>操作</span></div>
+            <div class="stage-head stage-ten"><span>花费检查点</span><span>FB最少单次链接点击数</span><span>FB最少加购数</span><span>FB最少成效数</span><span>最少访客数</span><span>最少商详页访客数</span><span>最少加购数</span><span>最少发起结账数</span><span>最少订单数</span><span>CPM上限（USD）</span><span>操作</span></div>
             <div id="xh-stage-list">
               ${stageRuleEntries(config.policy.stages).map(({ spend, stage }) => `<div class="stage-row stage-ten stage-policy-row">
                 <input class="stage-spend" type="number" min="0.01" step="0.01" value="${html(spend)}" title="花费检查点（USD）">
@@ -4479,6 +4560,7 @@
                 <input class="stage-cart" type="number" min="0" step="1" value="${html(stage.minAddToCart)}">
                 <input class="stage-checkout" type="number" min="0" step="1" value="${html(stage.minInitiateCheckout)}">
                 <input class="stage-orders" type="number" min="0" step="1" value="${html(stage.minOrders)}">
+                <input class="stage-cpm" type="number" min="0" step="0.01" value="${html(stage.maxCpm)}" title="0表示不检查CPM；大于0表示CPM不能超过该值">
                 <button type="button" class="stage-delete" title="删除检测点">删除</button>
               </div>`).join('')}
             </div>
@@ -4651,6 +4733,7 @@
         <input class="stage-cart" type="number" min="0" step="1" value="0">
         <input class="stage-checkout" type="number" min="0" step="1" value="0">
         <input class="stage-orders" type="number" min="0" step="1" value="0">
+        <input class="stage-cpm" type="number" min="0" step="0.01" value="0" title="0表示不检查CPM；大于0表示CPM不能超过该值">
         <button type="button" class="stage-delete" title="删除检测点">删除</button>
       </div>`);
     });

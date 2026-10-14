@@ -2,12 +2,30 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-10-10T16:16:21.511Z",
+  "updated_at": "2026-10-14T17:59:36.184Z",
   "versions": [
+    {
+      "version": "1.8.33",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-10-15",
+      "review_status": "approved",
+      "changelog": [
+        "花费检查点新增CPM上限（USD），填写0不检查，填写正数时要求广告CPM小于等于上限",
+        "CPM优先读取接口的cpm_usd或cpm字段，缺失或花费大于0但CPM为0时按花费和展示次数回算",
+        "CPM与同一行数量指标保持并且关系，相同花费检查点的多行继续使用或者关系",
+        "CPM数据不足时不误关活动广告，关闭广告保持暂停且不消耗复核次数，并对重复日志去重",
+        "旧配置自动将CPM上限补为0，CPM规则变化会更新复核策略版本并重新获得复核资格"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.33/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "e1393d7c1ebfbd194f99515047b141b5fadead9bea6f2465809b70eaeb3b06b6"
+    },
     {
       "version": "1.8.32",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-10-11",
