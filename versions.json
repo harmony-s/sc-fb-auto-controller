@@ -2,7 +2,7 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-10-14T17:59:36.184Z",
+  "updated_at": "2026-10-14T18:00:45.544Z",
   "versions": [
     {
       "version": "1.8.33",
@@ -20,7 +20,7 @@
         "旧配置自动将CPM上限补为0，CPM规则变化会更新复核策略版本并重新获得复核资格"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.33/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "e1393d7c1ebfbd194f99515047b141b5fadead9bea6f2465809b70eaeb3b06b6"
+      "sha256": "8999f9cdd76fb7c66e3341067e5e1892cc6a414cea26bc873e1972d11718b242"
     },
     {
       "version": "1.8.32",
