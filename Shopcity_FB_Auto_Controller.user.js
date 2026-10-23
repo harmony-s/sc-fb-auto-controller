@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Shopcity Facebook 广告自动控制器
 // @namespace    xh-shopcity
-// @version      1.8.33
-// @description  支持CPM上限检查、复核门槛与单页面执行保护。
+// @version      1.8.34
+// @description  支持全后台页面承载任务、休眠恢复与单标签页执行保护。
 // @match        https://*.shopcity.vip/admin*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -27,7 +27,7 @@
   const FEISHU_SECRET_KEY = 'xh_shopcity_fb_controller_feishu_secret_v1';
   const FEISHU_RECORD_CACHE_KEY = 'xh_shopcity_fb_controller_feishu_records_v1';
   const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-  const CURRENT_VERSION = '1.8.33';
+  const CURRENT_VERSION = '1.8.34';
   const SHOP_ID_CHECK_URL = 'https://api.shopcity.vip/sail/seller/check-user';
   const LOGIN_PASSWORD_KEY_PREFIX = 'xh_shopcity_fb_controller_login_password_v1_';
   const LOGIN_RETURN_URL_KEY = 'xh_shopcity_fb_controller_login_return_url_v1';
@@ -134,6 +134,7 @@
   let reviewExecutionVersion = 0;
   let zeroReopenExecutionVersion = 0;
   let runnerHeartbeatId = null;
+  let runRestoreTimerId = null;
   let lastRunnerPageLabel = '';
   let loginGuardTimerId = null;
   let loginGuardExecuting = false;
@@ -189,6 +190,10 @@
     return validRunnerLease(lease) && lease.instance_id === INSTANCE_ID;
   }
 
+  function leaseBelongsToThisPage(lease = readRunnerLease()) {
+    return Boolean(lease?.instance_id && lease.instance_id === INSTANCE_ID);
+  }
+
   function runnerPageLabel() {
     const lease = readRunnerLease();
     if (!validRunnerLease(lease)) return running || executing || zeroReopenExecuting ? '本页面' : '未运行';
@@ -227,6 +232,7 @@
     clearRunnerHeartbeat();
     setStatus('任务已转由其他页面执行，本页面停止广告操作', 'idle');
     updateButtons();
+    scheduleRunRestoreRetry();
   }
 
   function startRunnerHeartbeat() {
@@ -236,11 +242,15 @@
         clearRunnerHeartbeat();
         return;
       }
-      if (!ownsRunnerLease()) {
+      const lease = readRunnerLease();
+      if (leaseBelongsToThisPage(lease)) {
+        writeRunnerLease();
+      } else if (!validRunnerLease(lease) && acquireRunnerLease()) {
+        // The previous owner is gone; this tab can continue the saved run.
+      } else {
         handleRunnerLeaseLost();
         return;
       }
-      writeRunnerLease();
       renderOverview();
     }, RUNNER_HEARTBEAT_MS);
   }
@@ -250,6 +260,41 @@
     const lease = readRunnerLease();
     if (lease?.instance_id === INSTANCE_ID) localStorage.removeItem(key);
     clearRunnerHeartbeat();
+  }
+
+  function clearRunRestoreRetry() {
+    if (runRestoreTimerId) window.clearTimeout(runRestoreTimerId);
+    runRestoreTimerId = null;
+  }
+
+  function scheduleRunRestoreRetry(delayMs) {
+    clearRunRestoreRetry();
+    if (!isTaskHostPage() || !shouldRestoreRun() || running || executing) return;
+    const lease = readRunnerLease();
+    const waitMs = delayMs ?? (validRunnerLease(lease) ? 5000 : 1000);
+    runRestoreTimerId = window.setTimeout(() => {
+      runRestoreTimerId = null;
+      restoreRunAfterPageLoad().catch((error) => {
+        setStatus(`自动恢复运行失败：${error.message}`, 'error');
+        scheduleRunRestoreRetry(5000);
+      });
+    }, Math.max(250, waitMs));
+  }
+
+  function handlePageResumed() {
+    if (!isTaskHostPage() || document.hidden) return;
+    if (!running) {
+      scheduleRunRestoreRetry(250);
+      return;
+    }
+    const lease = readRunnerLease();
+    if (leaseBelongsToThisPage(lease) || !validRunnerLease(lease)) {
+      writeRunnerLease();
+      startRunnerHeartbeat();
+      updateButtons();
+      return;
+    }
+    handleRunnerLeaseLost();
   }
 
   function currentShopHost() {
@@ -273,12 +318,12 @@
     return `${location.origin}${LOGIN_PATH}`;
   }
 
-  function conversionUrl() {
+  function controllerReturnUrl() {
     const saved = String(localStorage.getItem(LOGIN_RETURN_URL_KEY) || '').trim();
     if (saved) {
       try {
         const url = new URL(saved, location.origin);
-        if (url.origin === location.origin && url.pathname.startsWith(CONVERSION_PATH)) return url.href;
+        if (url.origin === location.origin && isTaskHostPath(url.pathname)) return url.href;
       } catch (_) { /* ignore invalid saved return URL */ }
     }
     return `${location.origin}${CONVERSION_PATH}`;
@@ -3375,11 +3420,12 @@
   }
 
   function start() {
-    if (running) return;
+    if (running) return true;
     if (!acquireRunnerLease()) {
       setStatus('其他页面正在执行任务，本页面不能重复启动', 'idle');
       updateButtons();
-      return;
+      scheduleRunRestoreRetry();
+      return false;
     }
     try {
       readFormConfig();
@@ -3388,8 +3434,9 @@
     } catch (error) {
       releaseRunnerLease();
       setStatus(error.message, 'error');
-      return;
+      return false;
     }
+    clearRunRestoreRetry();
     running = true;
     loginExpired = false;
     setRunIntent(true);
@@ -3398,6 +3445,7 @@
     scheduleLoginGuard(1000);
     scheduleNextZeroReopen(1000);
     executeRound('start');
+    return true;
   }
 
   function stop() {
@@ -3406,6 +3454,7 @@
     reviewExecutionVersion += 1;
     zeroReopenExecutionVersion += 1;
     setRunIntent(false);
+    clearRunRestoreRetry();
     localStorage.removeItem(LOGIN_RESUME_KEY);
     clearScheduledRun();
     clearScheduledZeroReopen();
@@ -3414,16 +3463,21 @@
     setStatus(executing ? '已停止后续循环；本轮仍在执行' : '已停止', 'idle');
   }
 
-  function isConversionPage() {
-    return location.pathname.startsWith(CONVERSION_PATH);
+  function isAdminPath(pathname = location.pathname) {
+    return /^\/admin(?:\/|$)/.test(String(pathname || ''));
+  }
+
+  function isTaskHostPath(pathname = location.pathname) {
+    const path = String(pathname || '');
+    return isAdminPath(path) && !path.startsWith(LOGIN_PATH);
+  }
+
+  function isTaskHostPage() {
+    return isTaskHostPath(location.pathname);
   }
 
   function isLoginPage() {
     return location.pathname.startsWith(LOGIN_PATH);
-  }
-
-  function isAdminHomePage() {
-    return /^\/admin\/?$/.test(location.pathname);
   }
 
   function clearScheduledLoginGuard() {
@@ -3447,7 +3501,7 @@
   }
 
   function handleLoginExpired(message = '店铺登录状态已过期') {
-    const returnUrl = isConversionPage() ? location.href : `${location.origin}${CONVERSION_PATH}`;
+    const returnUrl = isTaskHostPage() ? location.href : `${location.origin}${CONVERSION_PATH}`;
     localStorage.setItem(LOGIN_RETURN_URL_KEY, returnUrl);
     if ((running || shouldRestoreRun()) && config.loginGuard.resumeAfterLogin) {
       localStorage.setItem(LOGIN_RESUME_KEY, '1');
@@ -3473,10 +3527,10 @@
     loginGuardFailCount = 0;
     loginExpired = false;
     localStorage.removeItem(LOGIN_ATTEMPT_KEY);
-    if (isConversionPage()) localStorage.removeItem(LOGIN_RETURN_URL_KEY);
+    if (isTaskHostPage()) localStorage.removeItem(LOGIN_RETURN_URL_KEY);
     const shopText = status.shopId ? `，Shop ID ${status.shopId}` : '';
     setLoginStatus(`登录状态正常${shopText}`, 'ok');
-    if ((localStorage.getItem(LOGIN_RESUME_KEY) === '1' || shouldRestoreRun()) && isConversionPage()) {
+    if ((localStorage.getItem(LOGIN_RESUME_KEY) === '1' || shouldRestoreRun()) && isTaskHostPage()) {
       localStorage.removeItem(LOGIN_RESUME_KEY);
       addLoginLog('LOGIN_RECOVERED', true, `登录已恢复${shopText}`);
       if ((config.loginGuard.resumeAfterLogin || shouldRestoreRun()) && !running && !executing) {
@@ -3500,14 +3554,14 @@
 
   function scheduleLoginGuard(delayMs) {
     clearScheduledLoginGuard();
-    if (!isConversionPage() || !config.loginGuard.enabled) return;
+    if (!isTaskHostPage() || !config.loginGuard.enabled) return;
     const interval = Math.max(1, numberValue(config.loginGuard.checkMinutes)) * 60000;
     loginGuardTimerId = window.setTimeout(runLoginGuardCheck, Math.max(1000, delayMs ?? interval));
   }
 
   async function runLoginGuardCheck() {
     clearScheduledLoginGuard();
-    if (!isConversionPage() || !config.loginGuard.enabled || loginGuardExecuting) return;
+    if (!isTaskHostPage() || !config.loginGuard.enabled || loginGuardExecuting) return;
     loginGuardExecuting = true;
     try {
       const status = await checkShopLoginStatus();
@@ -3646,8 +3700,8 @@
       if (config.loginGuard.resumeAfterLogin && shouldRestoreRun()) {
         localStorage.setItem(LOGIN_RESUME_KEY, '1');
       }
-      showLoginAutomationBanner('登录已恢复，正在进入广告控制页面…', 'ok');
-      location.replace(conversionUrl());
+      showLoginAutomationBanner('登录已恢复，正在返回登录前的后台页面…', 'ok');
+      location.replace(controllerReturnUrl());
       return true;
     }
     showLoginAutomationBanner(`登录请求已提交，但未确认登录成功：${lastMessage}。请检查页面提示或人工处理。`, 'error');
@@ -3659,13 +3713,13 @@
     showLoginAutomationBanner('Shopcity FB 自动控制器：正在检查登录状态…');
     const status = await checkShopLoginStatus();
     if (status.loggedIn) {
-      showLoginAutomationBanner('已登录，正在返回广告控制页面…', 'ok');
-      location.replace(conversionUrl());
+      showLoginAutomationBanner('已登录，正在返回后台页面…', 'ok');
+      location.replace(controllerReturnUrl());
       return;
     }
     const password = getLoginPassword();
     if (!config.loginGuard.username || !password) {
-      showLoginAutomationBanner('未保存自动登录账号或密码，请回到广告控制页面配置。', 'error');
+      showLoginAutomationBanner('未保存自动登录账号或密码，请回到任一店铺后台页面配置。', 'error');
       return;
     }
     if (hasVerificationChallenge()) {
@@ -3696,26 +3750,15 @@
     await waitForLoginSuccessAfterSubmit();
   }
 
-  async function runAdminBridgePage() {
-    if (!config.loginGuard.enabled) return;
-    const hasReturn = Boolean(localStorage.getItem(LOGIN_RETURN_URL_KEY) || localStorage.getItem(LOGIN_RESUME_KEY));
-    const shouldBridge = hasReturn || shouldRestoreRun() || isAdminHomePage();
-    if (!shouldBridge) return;
-    showLoginAutomationBanner('Shopcity FB 自动控制器：正在确认登录状态…');
-    const status = await checkShopLoginStatus();
-    if (status.loggedIn) {
-      localStorage.removeItem(LOGIN_ATTEMPT_KEY);
-      if (config.loginGuard.resumeAfterLogin && shouldRestoreRun()) localStorage.setItem(LOGIN_RESUME_KEY, '1');
-      showLoginAutomationBanner('登录已恢复，正在返回广告控制页面…', 'ok');
-      location.replace(conversionUrl());
-    } else if (config.loginGuard.autoLogin) {
-      showLoginAutomationBanner('登录仍未恢复，正在打开登录页…');
-      location.replace(shopLoginUrl());
-    }
-  }
-
   async function restoreRunAfterPageLoad() {
-    if (!isConversionPage() || !shouldRestoreRun() || running || executing) return;
+    if (!isTaskHostPage() || !shouldRestoreRun() || running || executing) return;
+    const lease = readRunnerLease();
+    if (validRunnerLease(lease) && !leaseBelongsToThisPage(lease)) {
+      setStatus('任务正在当前浏览器中的另一个同店铺标签页运行', 'idle');
+      updateButtons();
+      scheduleRunRestoreRetry();
+      return;
+    }
     if (config.loginGuard.enabled) {
       setStatus('正在确认登录状态，准备恢复循环…', 'working');
       setLoginStatus('正在确认登录状态…', 'working');
@@ -3728,7 +3771,9 @@
       return;
     }
     setStatus('页面刷新后自动恢复运行', 'ok');
-    window.setTimeout(start, 800);
+    window.setTimeout(() => {
+      if (!start()) scheduleRunRestoreRetry();
+    }, 800);
   }
 
   function readFormConfig() {
@@ -3954,7 +3999,7 @@
       { label: '自动暂停', value: actionCount(['PAUSE']), hint: '正式模式命中后暂停' },
       { label: '复核开启', value: config.review.enabled ? '已启用' : '已关闭', hint: `已通过复核开启 ${actionCount(['REOPEN'])} 条` },
       { label: '定时开启', value: config.zeroReopen.enabled ? '已启用' : '已关闭', hint: `已通过定时任务开启 ${actionCount(['REOPEN_ZERO_SPEND', 'REOPEN_SCHEDULED_SPEND'])} 条` },
-      { label: '执行页面', value: runnerPageLabel(), hint: runnerPageLabel() === '其他页面' ? '任务由另一个ShopCity标签页执行' : '同一店铺只允许一个页面执行' },
+      { label: '执行页面', value: runnerPageLabel(), hint: runnerPageLabel() === '其他页面' ? '任务由当前浏览器中的另一个同店铺标签页执行' : '当前浏览器中同一店铺只允许一个标签页执行' },
       { label: '失败', value: failed, hint: failed ? '存在失败日志' : '暂无失败', tone: failed ? 'danger' : '' },
       { label: '下次执行', value: document.querySelector('#xh-countdown')?.textContent || '未启动', hint: running ? '循环任务已启动' : '循环任务未启动', valueId: 'xh-overview-next-run' },
       { label: '运行模式', value: config.mode === 'live' ? '正式模式' : '观察模式', hint: config.mode === 'live' ? '命中后会执行暂停' : '只记录不暂停' },
@@ -4245,7 +4290,10 @@
     }
     if (event.key?.startsWith(RUNNER_LOCK_KEY_PREFIX)) {
       if ((running || executing || zeroReopenExecuting) && !ownsRunnerLease()) handleRunnerLeaseLost();
-      else updateButtons();
+      else {
+        updateButtons();
+        scheduleRunRestoreRetry(250);
+      }
     }
   }
 
@@ -4656,7 +4704,7 @@
             <div class="form-field login-shop-field"><label>Shop ID</label><div class="input-action"><input id="xh-shop-id" value="${html(config.shopId)}"><button type="button" id="xh-shop-id-detect">自动获取</button></div><span id="xh-shop-id-status" class="field-status" data-kind="idle">将从当前登录店铺自动识别</span></div>
             <div class="toggle-content login-guard-content">
               <label class="check-row"><input type="checkbox" id="xh-login-auto-enabled" ${config.loginGuard.autoLogin ? 'checked' : ''}>登录过期后使用店铺账号自动登录</label>
-              <label class="check-row"><input type="checkbox" id="xh-login-resume" ${config.loginGuard.resumeAfterLogin ? 'checked' : ''}>登录恢复后自动回到广告控制页并继续运行</label>
+              <label class="check-row"><input type="checkbox" id="xh-login-resume" ${config.loginGuard.resumeAfterLogin ? 'checked' : ''}>登录恢复后自动回到登录前后台页面并继续运行</label>
               <div class="two-cols">
                 <div class="form-field"><label>店铺账号</label><input id="xh-login-username" value="${html(config.loginGuard.username)}" autocomplete="username"></div>
                 <div class="form-field"><label>店铺密码</label><input id="xh-login-password" type="password" placeholder="${getLoginPassword() ? '已保存；留空表示不修改' : '仅建议填写低权限店铺子账号密码'}" autocomplete="current-password"></div>
@@ -4665,7 +4713,7 @@
                 <div class="form-field"><label>检测间隔</label><div class="input-with-unit"><input type="number" min="1" step="1" id="xh-login-check-minutes" value="${html(config.loginGuard.checkMinutes)}"><span>分钟</span></div></div>
                 <div class="form-field"><label>失败判定</label><div class="input-with-unit"><input type="number" min="1" step="1" id="xh-login-fail-limit" value="${html(config.loginGuard.failLimit)}"><span>连续次数</span></div></div>
               </div>
-              <details class="rule-details"><summary>ⓘ 登录状态守护说明</summary><div>登录过期后会暂停主任务、复核和定时开广告；自动登录会使用当前店铺域名的 /admin/login，只建议使用低权限店铺子账号。登录恢复或页面刷新后，如果循环此前处于启动状态，会自动回到广告控制页并继续运行；遇到验证码、安全校验或连续失败达到上限时会停止自动登录并提示人工处理。</div></details>
+              <details class="rule-details"><summary>ⓘ 登录状态守护说明</summary><div>除登录页外，当前店铺的所有后台页面都可显示面板并承载任务；当前浏览器中同一店铺只允许一个标签页实际执行。登录过期后会暂停主任务、复核和定时开广告；自动登录会使用当前店铺域名的 /admin/login，只建议使用低权限店铺子账号。登录恢复或页面刷新后，如果循环此前处于启动状态，会返回登录前后台页面并继续运行；遇到验证码、安全校验或连续失败达到上限时会停止自动登录并提示人工处理。</div></details>
               <div class="actions"><button type="button" id="xh-login-test">测试登录状态</button></div>
               <div class="info"><span id="xh-login-status" data-kind="idle">尚未检测登录状态</span><span>密码只保存在脚本管理器独立存储，不写入日志</span></div>
             </div>
@@ -4873,11 +4921,15 @@
       refreshRunnerStatusUi();
     }, 1000);
     window.addEventListener('storage', handleCrossPageStorage);
+    window.addEventListener('pageshow', handlePageResumed);
+    window.addEventListener('pagehide', releaseRunnerLease);
+    document.addEventListener('visibilitychange', handlePageResumed);
     window.addEventListener('beforeunload', () => {
       if (countdownId) window.clearInterval(countdownId);
       if (timerId) window.clearTimeout(timerId);
       if (zeroReopenTimerId) window.clearTimeout(zeroReopenTimerId);
       if (loginGuardTimerId) window.clearTimeout(loginGuardTimerId);
+      clearRunRestoreRetry();
       releaseRunnerLease();
     });
     renderSummaries();
@@ -4894,6 +4946,7 @@
       restoreRunAfterPageLoad().catch((error) => {
         setStatus(`自动恢复运行失败：${error.message}`, 'error');
         setLoginStatus(`自动恢复运行失败：${error.message}`, 'error');
+        scheduleRunRestoreRetry(5000);
       });
     }, 900);
     window.setTimeout(() => {
@@ -4916,11 +4969,7 @@
       runLoginPageAutomation().catch((error) => showLoginAutomationBanner(`自动登录异常：${error.message}`, 'error'));
       return;
     }
-    if (!isConversionPage()) {
-      runAdminBridgePage().catch((error) => showLoginAutomationBanner(`登录恢复检查异常：${error.message}`, 'error'));
-      return;
-    }
-    createPanel();
+    if (isTaskHostPage()) createPanel();
   }
 
   if (document.readyState === 'loading') {

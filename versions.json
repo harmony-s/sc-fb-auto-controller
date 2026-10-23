@@ -2,12 +2,31 @@
   "schema_version": 1,
   "repository": "https://github.com/harmony-s/sc-fb-auto-controller",
   "default_channel": "stable",
-  "updated_at": "2026-10-14T18:00:45.544Z",
+  "updated_at": "2026-10-23T15:45:56.557Z",
   "versions": [
+    {
+      "version": "1.8.34",
+      "channels": [
+        "stable"
+      ],
+      "developer": "harmony-s",
+      "published_at": "2026-10-23",
+      "review_status": "approved",
+      "changelog": [
+        "控制面板和任务循环支持除登录页外的所有ShopCity后台页面，不再要求停留在/admin/conversion",
+        "切换后台模块或刷新页面后保留启动意图，并在目标页面自动恢复循环",
+        "自动登录成功后返回登录前的后台页面，无有效返回地址时才回到/admin/conversion",
+        "同一浏览器中的同一店铺仅允许一个标签页实际执行广告操作，其他标签页只显示共享状态",
+        "浏览器锁屏、后台节流或电脑休眠恢复后，原标签页可续租自身运行锁",
+        "遇到活动锁或残留锁时自动重试恢复，锁释放或过期后由剩余标签页继续运行"
+      ],
+      "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.34/Shopcity_FB_Auto_Controller.user.js",
+      "sha256": "6acbf9a957d0e91500a9b2d23709b70da470fedffe95123ffca4dd5a5cd73356"
+    },
     {
       "version": "1.8.33",
       "channels": [
-        "stable"
+        "historical"
       ],
       "developer": "harmony-s",
       "published_at": "2026-10-15",
