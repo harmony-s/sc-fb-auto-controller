@@ -21,7 +21,7 @@
         "遇到活动锁或残留锁时自动重试恢复，锁释放或过期后由剩余标签页继续运行"
       ],
       "script_url": "https://raw.githubusercontent.com/harmony-s/sc-fb-auto-controller/master/releases/1.8.34/Shopcity_FB_Auto_Controller.user.js",
-      "sha256": "6acbf9a957d0e91500a9b2d23709b70da470fedffe95123ffca4dd5a5cd73356"
+      "sha256": "5792e63bcb98897530aadd713cffd08d5366e63f3aac05452e7109e120c72519"
     },
     {
       "version": "1.8.33",
